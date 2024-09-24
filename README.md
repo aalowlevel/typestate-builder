@@ -14,7 +14,10 @@
 
 ## Features
 
-- Compile-time safety: Ensures that all required fields are set before creating an instance of the struct.
+- The Typestate Pattern is the king in Rust!
+- No mess : Creates the necessary types and just does its job.
+- No runtime checks : Thus, there is no need for `Option` or `Result` types..
+- Safety at compile time : Ensures that all required fields are set before creating an instance of the struct.
 - Supports named and tuple structs (panics on else).
 - Simple, intuitive and rusty-way syntax for creating builders.
 
