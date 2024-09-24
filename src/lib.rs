@@ -17,6 +17,7 @@
 
 #[cfg(test)]
 mod tests {
+    use typestate_builder_macro::TypestateBuilder;
 
     #[test]
     fn builder_typestate() {
@@ -129,5 +130,15 @@ mod tests {
         println!("{:?}", person.get_email());
         person.set_email(Some("alice@example.com".to_string()));
         println!("{:?}", person);
+    }
+
+    #[test]
+    fn builder_typestate_derive() {
+        #[derive(Debug, TypestateBuilder)]
+        struct Person {
+            name: String,
+            age: u32,
+            email: Option<String>,
+        }
     }
 }
