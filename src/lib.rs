@@ -17,6 +17,102 @@
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::HashMap, marker::PhantomData};
+
+    use typestate_builder_macro::TypestateBuilder;
+
+    #[derive(TypestateBuilder)]
+    struct BasicStructWithLifetimes<'a> {
+        name: &'a str,
+        age: u32,
+        description: &'a str,
+    }
+
+    #[derive(TypestateBuilder)]
+    struct GenericStruct<T, U>
+    where
+        T: Copy,
+        U: Copy,
+    {
+        field1: T,
+        field2: U,
+    }
+
+    #[derive(TypestateBuilder)]
+    struct InnerStruct {
+        x: i32,
+        y: i32,
+    }
+
+    #[derive(TypestateBuilder)]
+    struct OuterStruct {
+        name: String,
+        inner: InnerStruct,
+        active: bool,
+    }
+
+    /* Panic: TypestateBuilder only supports structs */
+    // #[derive(TypestateBuilder)]
+    enum Status {
+        Active,
+        Inactive,
+        Suspended,
+    }
+
+    #[derive(TypestateBuilder)]
+    struct EnumWithinStruct {
+        user_id: u64,
+        status: Status,
+    }
+
+    #[derive(TypestateBuilder)]
+    struct StructWithOptionals {
+        title: Option<String>,
+        description: Option<String>,
+        rating: Option<u8>,
+    }
+
+    /* Panic: Not yet implemented */
+    // #[derive(TypestateBuilder)]
+    struct TupleStruct(i32, f64, String, Option<u8>);
+
+    #[derive(TypestateBuilder)]
+    struct ComplexStruct {
+        name: String,
+        values: Vec<i32>,
+        map: HashMap<String, u64>,
+    }
+
+    #[derive(TypestateBuilder)]
+    struct RecursiveStruct {
+        value: i32,
+        next: Option<Box<RecursiveStruct>>,
+    }
+
+    #[derive(TypestateBuilder)]
+    struct PhantomStruct<T> {
+        data: i32,
+        marker: PhantomData<T>,
+    }
+
+    /* Panic: May only be applied tostruct's. */
+    // #[derive(TypestateBuilder)]
+    trait MyTrait {
+        fn do_something(&self);
+    }
+
+    #[derive(TypestateBuilder)]
+    struct StructWithCustomTrait {
+        name: String,
+        value: u32,
+    }
+
+    impl MyTrait for StructWithCustomTrait {
+        fn do_something(&self) {
+            println!("Doing something with {}", self.name);
+        }
+    }
+
     #[test]
     fn builder_typestate() {
         #[derive(Debug)]

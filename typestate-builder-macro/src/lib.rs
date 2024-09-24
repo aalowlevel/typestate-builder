@@ -41,11 +41,11 @@
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use proc_macro_error::{emit_call_site_warning, proc_macro_error};
-use quote::{format_ident, quote, ToTokens};
+use proc_macro_error::proc_macro_error;
+use quote::{format_ident, quote};
 use syn::{
-    parse_macro_input, Data, DeriveInput, Field, Fields, FieldsNamed, FieldsUnnamed, GenericParam,
-    Generics, Ident, Lifetime, Type,
+    parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, GenericParam, Ident,
+    Lifetime, Type,
 };
 use titlecase::titlecase;
 

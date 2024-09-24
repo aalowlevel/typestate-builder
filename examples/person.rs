@@ -13,7 +13,7 @@
 
 use typestate_builder_macro::TypestateBuilder;
 
-#[derive(Debug, TypestateBuilder)]
+#[derive(TypestateBuilder)]
 pub struct Person<'a, T> {
     name: &'a T,
     age: u32,
