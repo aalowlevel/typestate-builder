@@ -60,6 +60,8 @@ mod tests {
                 }
             }
         }
+
+        // Add "constructor"'s
         impl<Age, Email> PersonBuilder<PersonBuilderNameNotAdded, Age, Email> {
             fn name(self, name: String) -> PersonBuilder<PersonBuilderNameAdded, Age, Email> {
                 PersonBuilder {
@@ -69,6 +71,7 @@ mod tests {
                 }
             }
         }
+
         impl<Name, Email> PersonBuilder<Name, PersonBuilderAgeNotAdded, Email> {
             fn age(self, age: u32) -> PersonBuilder<Name, PersonBuilderAgeAdded, Email> {
                 PersonBuilder {
@@ -78,6 +81,7 @@ mod tests {
                 }
             }
         }
+
         impl<Name, Age> PersonBuilder<Name, Age, PersonBuilderEmailNotAdded> {
             fn email(
                 self,
@@ -90,6 +94,8 @@ mod tests {
                 }
             }
         }
+
+        // Build time
         impl PersonBuilder<PersonBuilderNameAdded, PersonBuilderAgeAdded, PersonBuilderEmailAdded> {
             fn build(self) -> Person {
                 Person {
@@ -97,6 +103,16 @@ mod tests {
                     age: self.age.0,
                     email: self.email.0,
                 }
+            }
+        }
+
+        // Add setter and/or getter method for a field
+        impl Person {
+            fn get_email(&self) -> &Option<String> {
+                &self.email
+            }
+            fn set_email(&mut self, email: Option<String>) {
+                self.email = email;
             }
         }
 
@@ -108,7 +124,10 @@ mod tests {
         println!("{:?}", builder);
         let builder = builder.email(None);
         println!("{:?}", builder);
-        let person = builder.build();
+        let mut person = builder.build();
+        println!("{:?}", person);
+        println!("{:?}", person.get_email());
+        person.set_email(Some("alice@example.com".to_string()));
         println!("{:?}", person);
     }
 }
