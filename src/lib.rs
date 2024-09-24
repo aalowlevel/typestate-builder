@@ -13,7 +13,7 @@
 
 #![warn(missing_docs)]
 
-/*! A Rust library that generates design patterns. */
+/*! Derive-macro-based generator that combines `Typestate` and `Builder` patterns. */
 
 #[cfg(test)]
 mod tests {

@@ -1,1 +1,1 @@
-Derive macro based generator that combines `Typestate` and `Builder` patterns.
+Derive-macro-based generator that combines `Typestate` and `Builder` patterns.
