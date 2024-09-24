@@ -41,8 +41,9 @@
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, FieldsUnnamed};
+use quote::{format_ident, quote};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, Ident, Type};
+use titlecase::titlecase;
 
 /// Struct to hold the generated output of the `TypestateBuilder` macro.
 struct TypestateBuilderOutPut {
@@ -113,7 +114,77 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
 /// A `TypestateBuilderOutPut` struct containing the generated state structs,
 /// builder struct, builder methods, and the build method for the named struct.
 fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> TypestateBuilderOutPut {
-    todo!()
+    let vis = &input.vis;
+    let ident = &input.ident;
+    let generics = &input.generics;
+
+    // Ident for the builder struct.
+    let builder_struct_ident = format_ident!("{}Builder", ident);
+
+    // State structs & collect data.
+    struct FieldData<'a> {
+        ident: &'a Ident,
+        ident_titlecase: Ident,
+        ty: &'a Type,
+        state_struct_empty: Ident,
+        state_struct_added: Ident,
+    }
+    let mut field_data = Vec::new();
+    let mut state_structs = Vec::new();
+
+    // Iterate for state structs and to collect some data.
+    for field in fields.named.iter() {
+        // Ident
+        let field_ident = field
+            .ident
+            .as_ref()
+            .expect("field name of named struct cannot be `None`");
+        let field_ident_titlecase = format_ident!("{}", titlecase(&field_ident.to_string()));
+
+        // Type
+        let field_type = &field.ty;
+
+        // State structs
+        let state_struct_empty =
+            format_ident!("{}{}Empty", builder_struct_ident, field_ident_titlecase);
+        let state_struct_added =
+            format_ident!("{}{}Added", builder_struct_ident, field_ident_titlecase);
+        state_structs.push(quote! {
+            struct #state_struct_added(#field_type);
+            struct #state_struct_empty;
+        });
+
+        field_data.push(FieldData {
+            ident: field_ident,
+            ident_titlecase: field_ident_titlecase,
+            ty: field_type,
+            state_struct_empty,
+            state_struct_added,
+        });
+    }
+
+    // Builder struct.
+    let builder_generics: Vec<_> = field_data.iter().map(|f| &f.ident_titlecase).collect();
+    let builder_fields: Vec<_> = field_data
+        .iter()
+        .map(|f| {
+            let ident = f.ident;
+            let ident_titlecase = &f.ident_titlecase;
+            quote! { #ident: #ident_titlecase }
+        })
+        .collect();
+    let builder_struct = quote! {
+        struct #builder_struct_ident <#(#builder_generics),*> { #(#builder_fields),* }
+    };
+
+    let mut builder_methods = Vec::new();
+
+    TypestateBuilderOutPut {
+        state_structs,
+        builder_struct,
+        builder_methods,
+        build_method: quote! {},
+    }
 }
 
 /// Generates the builder code for tuple structs (i.e., structs with unnamed fields).

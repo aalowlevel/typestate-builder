@@ -15,6 +15,15 @@
 
 /*! Derive-macro-based generator that combines `Typestate` and `Builder` patterns. */
 
+use typestate_builder_macro::TypestateBuilder;
+
+#[derive(Debug, TypestateBuilder)]
+pub struct Person<'a> {
+    name: &'a str,
+    age: u32,
+    email: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use typestate_builder_macro::TypestateBuilder;
@@ -31,15 +40,15 @@ mod tests {
         #[derive(Debug)]
         struct PersonBuilderNameAdded(String);
         #[derive(Debug)]
-        struct PersonBuilderNameNotAdded;
+        struct PersonBuilderNameEmpty;
         #[derive(Debug)]
         struct PersonBuilderAgeAdded(u32);
         #[derive(Debug)]
-        struct PersonBuilderAgeNotAdded;
+        struct PersonBuilderAgeEmpty;
         #[derive(Debug)]
         struct PersonBuilderEmailAdded(Option<String>);
         #[derive(Debug)]
-        struct PersonBuilderEmailNotAdded;
+        struct PersonBuilderEmailEmpty;
 
         #[derive(Debug)]
         struct PersonBuilder<Name, Age, Email> {
@@ -49,21 +58,19 @@ mod tests {
         }
 
         impl Person {
-            fn builder() -> PersonBuilder<
-                PersonBuilderNameNotAdded,
-                PersonBuilderAgeNotAdded,
-                PersonBuilderEmailNotAdded,
-            > {
+            fn builder(
+            ) -> PersonBuilder<PersonBuilderNameEmpty, PersonBuilderAgeEmpty, PersonBuilderEmailEmpty>
+            {
                 PersonBuilder {
-                    name: PersonBuilderNameNotAdded,
-                    age: PersonBuilderAgeNotAdded,
-                    email: PersonBuilderEmailNotAdded,
+                    name: PersonBuilderNameEmpty,
+                    age: PersonBuilderAgeEmpty,
+                    email: PersonBuilderEmailEmpty,
                 }
             }
         }
 
         // Add "constructor"'s
-        impl<Age, Email> PersonBuilder<PersonBuilderNameNotAdded, Age, Email> {
+        impl<Age, Email> PersonBuilder<PersonBuilderNameEmpty, Age, Email> {
             fn name(self, name: String) -> PersonBuilder<PersonBuilderNameAdded, Age, Email> {
                 PersonBuilder {
                     name: PersonBuilderNameAdded(name),
@@ -73,7 +80,7 @@ mod tests {
             }
         }
 
-        impl<Name, Email> PersonBuilder<Name, PersonBuilderAgeNotAdded, Email> {
+        impl<Name, Email> PersonBuilder<Name, PersonBuilderAgeEmpty, Email> {
             fn age(self, age: u32) -> PersonBuilder<Name, PersonBuilderAgeAdded, Email> {
                 PersonBuilder {
                     name: self.name,
@@ -83,7 +90,7 @@ mod tests {
             }
         }
 
-        impl<Name, Age> PersonBuilder<Name, Age, PersonBuilderEmailNotAdded> {
+        impl<Name, Age> PersonBuilder<Name, Age, PersonBuilderEmailEmpty> {
             fn email(
                 self,
                 email: Option<String>,
@@ -133,12 +140,5 @@ mod tests {
     }
 
     #[test]
-    fn builder_typestate_derive() {
-        #[derive(Debug, TypestateBuilder)]
-        struct Person {
-            name: String,
-            age: u32,
-            email: Option<String>,
-        }
-    }
+    fn builder_typestate_derive() {}
 }
