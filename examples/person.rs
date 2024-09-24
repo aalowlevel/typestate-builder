@@ -14,8 +14,8 @@
 use typestate_builder_macro::TypestateBuilder;
 
 #[derive(TypestateBuilder)]
-pub struct Person<'a, T> {
-    name: &'a T,
+pub struct Person {
+    name: String,
     age: u32,
     email: Option<String>,
 }

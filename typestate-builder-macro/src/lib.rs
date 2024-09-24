@@ -55,8 +55,11 @@ struct TypestateBuilderOutPut {
     state_structs: Vec<TokenStream2>,
     /// The builder struct itself, which is used to construct the final type.
     builder_struct: TokenStream2,
+
+    /** Beginning point for the builder struct. */
+    builder_method: TokenStream2,
     /// A collection of methods for setting the fields of the builder in the correct order.
-    builder_methods: Vec<TokenStream2>,
+    builder_setter_methods: Vec<TokenStream2>,
     /// The final build method that assembles the struct after all required fields are set.
     build_method: TokenStream2,
 }
@@ -77,7 +80,8 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     let TypestateBuilderOutPut {
         state_structs,
         builder_struct,
-        builder_methods,
+        builder_method,
+        builder_setter_methods,
         build_method,
     } = match &input.data {
         // Handle named field structs.
@@ -96,7 +100,8 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     let output = quote! {
         #(#state_structs)*
         #builder_struct
-        #(#builder_methods)*
+        #builder_method,
+        #(#builder_setter_methods)*
         #build_method
     };
 
@@ -119,6 +124,7 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
     let vis = &input.vis;
     let ident = &input.ident;
     let generics = &input.generics;
+    let where_clause = &generics.where_clause;
 
     // Ident for the builder struct.
     let builder_struct_ident = format_ident!("{}Builder", ident);
@@ -215,12 +221,34 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         struct #builder_struct_ident <#(#builder_generics),*> { #(#builder_fields),* }
     };
 
-    let mut builder_methods = Vec::new();
+    // Builder method.
+    let builder_method_generics: Vec<_> =
+        field_data.iter().map(|f| &f.state_struct_empty).collect();
+    let builder_method_builder_fields: Vec<_> = field_data
+        .iter()
+        .map(|f| {
+            let field_name = f.ident;
+            let field_type = &f.state_struct_empty;
+            quote! { #field_name: #field_type }
+        })
+        .collect();
+    let builder_method = quote! {
+        impl #generics #ident #generics #where_clause {
+            #vis fn builder() -> #builder_struct_ident < #(#builder_method_generics),* > {
+                #builder_struct_ident {
+                    #(#builder_method_builder_fields),*
+                }
+            }
+        }
+    };
+
+    let mut builder_setter_methods = Vec::new();
 
     TypestateBuilderOutPut {
         state_structs,
         builder_struct,
-        builder_methods,
+        builder_method,
+        builder_setter_methods,
         build_method: quote! {},
     }
 }
