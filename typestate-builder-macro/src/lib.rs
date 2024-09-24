@@ -59,7 +59,7 @@ struct TypestateBuilderOutPut {
     /** Beginning point for the builder struct. */
     builder_method: TokenStream2,
     /// A collection of methods for setting the fields of the builder in the correct order.
-    builder_setter_methods: Vec<TokenStream2>,
+    builder_constructor_methods: Vec<TokenStream2>,
     /// The final build method that assembles the struct after all required fields are set.
     build_method: TokenStream2,
 }
@@ -81,7 +81,7 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
         state_structs,
         builder_struct,
         builder_method,
-        builder_setter_methods,
+        builder_constructor_methods,
         build_method,
     } = match &input.data {
         // Handle named field structs.
@@ -101,7 +101,7 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
         #(#state_structs)*
         #builder_struct
         #builder_method,
-        #(#builder_setter_methods)*
+        #(#builder_constructor_methods)*
         #build_method
     };
 
@@ -242,13 +242,14 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         }
     };
 
-    let mut builder_setter_methods = Vec::new();
+    // Builder constructor methods.
+    let mut builder_constructor_methods = Vec::new();
 
     TypestateBuilderOutPut {
         state_structs,
         builder_struct,
         builder_method,
-        builder_setter_methods,
+        builder_constructor_methods,
         build_method: quote! {},
     }
 }
