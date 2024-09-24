@@ -41,7 +41,7 @@
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use proc_macro_error::proc_macro_error;
+use proc_macro_error::{emit_call_site_warning, proc_macro_error};
 use quote::{format_ident, quote};
 use syn::{
     parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, GenericParam, Ident,
@@ -100,7 +100,7 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     let output = quote! {
         #(#state_structs)*
         #builder_struct
-        #builder_method,
+        #builder_method
         #(#builder_constructor_methods)*
         #build_method
     };
@@ -244,6 +244,34 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
 
     // Builder constructor methods.
     let mut builder_constructor_methods = Vec::new();
+    for (i0, field0) in field_data.iter().enumerate() {
+        let mut declare_generics = Vec::new();
+        let mut builder_generics = Vec::new();
+
+        for (i1, field1) in field_data.iter().enumerate() {
+            if i0 == i1 {
+                builder_generics.push(&field1.state_struct_empty);
+            } else {
+                declare_generics.push(&field1.ident_titlecase);
+                builder_generics.push(&field1.ident_titlecase);
+            }
+        }
+
+        let declare_generics = if !declare_generics.is_empty() {
+            quote! { < #(#declare_generics),* > }
+        } else {
+            quote! {}
+        };
+        let builder_generics = if !builder_generics.is_empty() {
+            quote! { < #(#builder_generics),* >}
+        } else {
+            quote! {}
+        };
+
+        builder_constructor_methods.push(quote! {
+            impl #declare_generics #builder_struct_ident #builder_generics {}
+        });
+    }
 
     TypestateBuilderOutPut {
         state_structs,
