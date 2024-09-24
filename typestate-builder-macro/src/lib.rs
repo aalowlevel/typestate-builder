@@ -42,7 +42,10 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, Ident, Type};
+use syn::{
+    parse_macro_input, Data, DeriveInput, Field, Fields, FieldsNamed, FieldsUnnamed, GenericParam,
+    Generics, Ident, Lifetime, Type,
+};
 use titlecase::titlecase;
 
 /// Struct to hold the generated output of the `TypestateBuilder` macro.
@@ -125,9 +128,10 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
     struct FieldData<'a> {
         ident: &'a Ident,
         ident_titlecase: Ident,
-        ty: &'a Type,
         state_struct_empty: Ident,
         state_struct_added: Ident,
+        ty: &'a Type,
+        generics: Vec<GenericParamKind<'a>>,
     }
     let mut field_data = Vec::new();
     let mut state_structs = Vec::new();
@@ -157,9 +161,10 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         field_data.push(FieldData {
             ident: field_ident,
             ident_titlecase: field_ident_titlecase,
-            ty: field_type,
             state_struct_empty,
             state_struct_added,
+            ty: field_type,
+            generics: extract_generic_usage(field, generics),
         });
     }
 
@@ -217,4 +222,85 @@ fn generate_tuple_struct_code(
 /// builder struct, builder methods, and the build method for the unit struct.
 fn generate_unit_struct_code(input: &DeriveInput) -> TypestateBuilderOutPut {
     todo!()
+}
+
+#[derive(Clone)]
+enum GenericParamKind<'a> {
+    Type(&'a Ident),
+    Lifetime(&'a Lifetime),
+    Const(&'a Ident),
+}
+
+fn extract_generic_usage<'a>(
+    field: &'a Field,
+    generics: &'a Generics,
+) -> Vec<GenericParamKind<'a>> {
+    let generic_params: Vec<GenericParamKind> = generics
+        .params
+        .iter()
+        .map(|param| match param {
+            GenericParam::Type(type_param) => GenericParamKind::Type(&type_param.ident),
+            GenericParam::Lifetime(lifetime_def) => {
+                GenericParamKind::Lifetime(&lifetime_def.lifetime)
+            }
+            GenericParam::Const(const_param) => GenericParamKind::Const(&const_param.ident),
+        })
+        .collect();
+
+    check_type_for_generics(&field.ty, &generic_params)
+}
+
+fn check_type_for_generics<'a>(
+    ty: &Type,
+    generic_params: &[GenericParamKind<'a>],
+) -> Vec<GenericParamKind<'a>> {
+    let mut used_generics = Vec::new();
+
+    match ty {
+        Type::Path(type_path) => {
+            for segment in &type_path.path.segments {
+                if let Some(param) = generic_params.iter().find(|p| match p {
+                    GenericParamKind::Type(ident) | GenericParamKind::Const(ident) => {
+                        *ident == &segment.ident
+                    }
+                    _ => false,
+                }) {
+                    used_generics.push(param.clone());
+                }
+                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                    for arg in &args.args {
+                        match arg {
+                            syn::GenericArgument::Type(nested_type) => {
+                                used_generics
+                                    .extend(check_type_for_generics(nested_type, generic_params));
+                            }
+                            syn::GenericArgument::Lifetime(lifetime) => {
+                                if let Some(param) = generic_params.iter().find(|p| match p {
+                                    GenericParamKind::Lifetime(lt) => *lt == lifetime,
+                                    _ => false,
+                                }) {
+                                    used_generics.push(param.clone());
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        Type::Reference(type_ref) => {
+            if let Some(lifetime) = &type_ref.lifetime {
+                if let Some(param) = generic_params.iter().find(|p| match p {
+                    GenericParamKind::Lifetime(lt) => *lt == lifetime,
+                    _ => false,
+                }) {
+                    used_generics.push(param.clone());
+                }
+            }
+            used_generics.extend(check_type_for_generics(&type_ref.elem, generic_params));
+        }
+        _ => {}
+    }
+
+    used_generics
 }
