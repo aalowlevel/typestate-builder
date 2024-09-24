@@ -1,0 +1,21 @@
+[package]
+name = "typestate-builder"
+version = "0.1.0"
+edition = "2021"
+authors = ["Andy Allison <rustacean15@gmail.com>"]
+description = "Derive macro based generator that combines `Typestate` and `Builder` patterns."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/aalowlevel/typestate-builder"
+keywords = [
+    "rust",
+    "derive",
+    "pattern",
+    "macro",
+    "builder",
+    "state",
+    "typestate",
+]
+categories = ["pattern", "code-generation", "development-tools"]
+
+[dependencies]
+typestate-builder-macro = { path = "./typestate-builder-macro" }
