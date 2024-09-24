@@ -218,7 +218,7 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         })
         .collect();
     let builder_struct = quote! {
-        struct #builder_struct_ident <#(#builder_generics),*> { #(#builder_fields),* }
+        #vis struct #builder_struct_ident <#(#builder_generics),*> { #(#builder_fields),* }
     };
 
     // Builder method.
@@ -245,15 +245,27 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
     // Builder constructor methods.
     let mut builder_constructor_methods = Vec::new();
     for (i0, field0) in field_data.iter().enumerate() {
+        let field0_name = field0.ident;
+        let field0_type = field0.ty;
+        let field_struct_added = &field0.state_struct_added;
+
         let mut declare_generics = Vec::new();
         let mut builder_generics = Vec::new();
+        let mut builder_generics_res = Vec::new();
+        let mut builder_data = Vec::new();
 
         for (i1, field1) in field_data.iter().enumerate() {
+            let field1_name = field1.ident;
+
             if i0 == i1 {
                 builder_generics.push(&field1.state_struct_empty);
+                builder_generics_res.push(&field1.state_struct_added);
+                builder_data.push(quote! { #field1_name: #field_struct_added (#field1_name) });
             } else {
                 declare_generics.push(&field1.ident_titlecase);
                 builder_generics.push(&field1.ident_titlecase);
+                builder_generics_res.push(&field1.ident_titlecase);
+                builder_data.push(quote! { #field1_name: self.#field1_name });
             }
         }
 
@@ -267,9 +279,20 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         } else {
             quote! {}
         };
+        let builder_generics_res = if !builder_generics_res.is_empty() {
+            quote! { < #(#builder_generics_res),* >}
+        } else {
+            quote! {}
+        };
 
         builder_constructor_methods.push(quote! {
-            impl #declare_generics #builder_struct_ident #builder_generics {}
+            impl #declare_generics #builder_struct_ident #builder_generics {
+                #vis fn #field0_name(self, #field0_name: #field0_type) -> #builder_struct_ident #builder_generics_res {
+                    #builder_struct_ident {
+                        #(#builder_data),*
+                    }
+                }
+            }
         });
     }
 
