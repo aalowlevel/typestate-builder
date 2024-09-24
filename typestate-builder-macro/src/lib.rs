@@ -41,7 +41,8 @@
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{format_ident, quote};
+use proc_macro_error::{emit_call_site_warning, proc_macro_error};
+use quote::{format_ident, quote, ToTokens};
 use syn::{
     parse_macro_input, Data, DeriveInput, Field, Fields, FieldsNamed, FieldsUnnamed, GenericParam,
     Generics, Ident, Lifetime, Type,
@@ -67,6 +68,7 @@ struct TypestateBuilderOutPut {
 /// # Panics
 /// This macro will panic if applied to a non-struct type (such as an enum or union).
 #[proc_macro_derive(TypestateBuilder)]
+#[proc_macro_error]
 pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     // Parse the input token stream into a `DeriveInput` structure.
     let input = parse_macro_input!(input as DeriveInput);
@@ -93,11 +95,8 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     // Combine the generated code into a final token stream.
     let output = quote! {
         #(#state_structs)*
-
         #builder_struct
-
         #(#builder_methods)*
-
         #build_method
     };
 
@@ -136,6 +135,19 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
     let mut field_data = Vec::new();
     let mut state_structs = Vec::new();
 
+    // Extract generics of the main struct.
+    let generic_params_main: Vec<GenericParamKind> = generics
+        .params
+        .iter()
+        .map(|param| match param {
+            GenericParam::Type(type_param) => GenericParamKind::Type(&type_param.ident),
+            GenericParam::Lifetime(lifetime_def) => {
+                GenericParamKind::Lifetime(&lifetime_def.lifetime)
+            }
+            GenericParam::Const(const_param) => GenericParamKind::Const(&const_param.ident),
+        })
+        .collect();
+
     // Iterate for state structs and to collect some data.
     for field in fields.named.iter() {
         // Ident
@@ -148,13 +160,34 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         // Type
         let field_type = &field.ty;
 
+        // Extract generics
+        let field_generics = check_type_for_generics(&field.ty, &generic_params_main);
+        let field_generics_ts = if !field_generics.is_empty() {
+            let field_generics: Vec<_> = field_generics
+                .iter()
+                .map(|f| match f {
+                    GenericParamKind::Type(f) => quote! { #f },
+                    GenericParamKind::Lifetime(f) => quote! { #f },
+                    GenericParamKind::Const(f) => quote! { #f },
+                })
+                .collect();
+
+            /* 🛠️ WORKAROUND #WA96766639 The reason why result of `quote! { < #(#field_generics),* > }` is wrong like `'a>`` is unknown. */
+            let field_generics = quote! { #(#field_generics),* };
+            quote! {
+                < #field_generics >
+            }
+        } else {
+            quote! {}
+        };
+
         // State structs
         let state_struct_empty =
             format_ident!("{}{}Empty", builder_struct_ident, field_ident_titlecase);
         let state_struct_added =
             format_ident!("{}{}Added", builder_struct_ident, field_ident_titlecase);
         state_structs.push(quote! {
-            struct #state_struct_added(#field_type);
+            struct #state_struct_added #field_generics_ts (#field_type);
             struct #state_struct_empty;
         });
 
@@ -164,7 +197,7 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
             state_struct_empty,
             state_struct_added,
             ty: field_type,
-            generics: extract_generic_usage(field, generics),
+            generics: field_generics,
         });
     }
 
@@ -231,55 +264,44 @@ enum GenericParamKind<'a> {
     Const(&'a Ident),
 }
 
-fn extract_generic_usage<'a>(
-    field: &'a Field,
-    generics: &'a Generics,
-) -> Vec<GenericParamKind<'a>> {
-    let generic_params: Vec<GenericParamKind> = generics
-        .params
-        .iter()
-        .map(|param| match param {
-            GenericParam::Type(type_param) => GenericParamKind::Type(&type_param.ident),
-            GenericParam::Lifetime(lifetime_def) => {
-                GenericParamKind::Lifetime(&lifetime_def.lifetime)
-            }
-            GenericParam::Const(const_param) => GenericParamKind::Const(&const_param.ident),
-        })
-        .collect();
-
-    check_type_for_generics(&field.ty, &generic_params)
-}
-
 fn check_type_for_generics<'a>(
     ty: &Type,
-    generic_params: &[GenericParamKind<'a>],
+    generic_params_main: &[GenericParamKind<'a>],
 ) -> Vec<GenericParamKind<'a>> {
-    let mut used_generics = Vec::new();
+    let mut generics_params_field = Vec::new();
 
     match ty {
+        // Handles cases like T
         Type::Path(type_path) => {
             for segment in &type_path.path.segments {
-                if let Some(param) = generic_params.iter().find(|p| match p {
+                // Check if the type or const is present in the generic params
+                if let Some(param) = generic_params_main.iter().find(|p| match p {
                     GenericParamKind::Type(ident) | GenericParamKind::Const(ident) => {
                         *ident == &segment.ident
                     }
                     _ => false,
                 }) {
-                    used_generics.push(param.clone());
+                    generics_params_field.push(param.clone());
                 }
+
+                // Handle nested generics like Option<T>
                 if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
                     for arg in &args.args {
                         match arg {
                             syn::GenericArgument::Type(nested_type) => {
-                                used_generics
-                                    .extend(check_type_for_generics(nested_type, generic_params));
+                                // Recursively check nested types
+                                generics_params_field.extend(check_type_for_generics(
+                                    nested_type,
+                                    generic_params_main,
+                                ));
                             }
                             syn::GenericArgument::Lifetime(lifetime) => {
-                                if let Some(param) = generic_params.iter().find(|p| match p {
+                                // Check lifetimes inside nested generics
+                                if let Some(param) = generic_params_main.iter().find(|p| match p {
                                     GenericParamKind::Lifetime(lt) => *lt == lifetime,
                                     _ => false,
                                 }) {
-                                    used_generics.push(param.clone());
+                                    generics_params_field.push(param.clone());
                                 }
                             }
                             _ => {}
@@ -288,19 +310,26 @@ fn check_type_for_generics<'a>(
                 }
             }
         }
+
+        // Handles cases like &'a T
         Type::Reference(type_ref) => {
+            // Check for the lifetime in the reference
             if let Some(lifetime) = &type_ref.lifetime {
-                if let Some(param) = generic_params.iter().find(|p| match p {
+                if let Some(param) = generic_params_main.iter().find(|p| match p {
                     GenericParamKind::Lifetime(lt) => *lt == lifetime,
                     _ => false,
                 }) {
-                    used_generics.push(param.clone());
+                    generics_params_field.push(param.clone());
                 }
             }
-            used_generics.extend(check_type_for_generics(&type_ref.elem, generic_params));
+
+            // Recursively check the type inside the reference (&'a T -> T)
+            generics_params_field
+                .extend(check_type_for_generics(&type_ref.elem, generic_params_main));
         }
+
         _ => {}
     }
 
-    used_generics
+    generics_params_field
 }

@@ -15,19 +15,8 @@
 
 /*! Derive-macro-based generator that combines `Typestate` and `Builder` patterns. */
 
-use typestate_builder_macro::TypestateBuilder;
-
-#[derive(Debug, TypestateBuilder)]
-pub struct Person<'a> {
-    name: &'a str,
-    age: u32,
-    email: Option<String>,
-}
-
 #[cfg(test)]
 mod tests {
-    use typestate_builder_macro::TypestateBuilder;
-
     #[test]
     fn builder_typestate() {
         #[derive(Debug)]
@@ -138,7 +127,4 @@ mod tests {
         person.set_email(Some("alice@example.com".to_string()));
         println!("{:?}", person);
     }
-
-    #[test]
-    fn builder_typestate_derive() {}
 }
