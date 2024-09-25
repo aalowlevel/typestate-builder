@@ -308,10 +308,19 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
     }
 
     // Build method.
+    let mut declare_generics = Vec::new();
     let build_impl_block_generics = field_data
         .iter()
-        .map(|f| &f.state_struct_added)
+        .map(|f| {
+            let added_type = &f.state_struct_added;
+            let generics =
+                create_generics_from_collection(&GenericParamKind::to_token_stream(&f.generics));
+            declare_generics.extend(f.generics.clone());
+            quote! { #added_type #generics }
+        })
         .collect::<Vec<_>>();
+    let declare_generics =
+        create_generics_from_collection(&GenericParamKind::to_token_stream(&declare_generics));
     let build_impl_block_generics = create_generics_from_collection(&build_impl_block_generics);
     let build_method_data = field_data
         .iter()
@@ -321,8 +330,8 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         })
         .collect::<Vec<_>>();
     let build_method = quote! {
-        impl #builder_struct_ident #build_impl_block_generics {
-            #vis fn build(self) -> #ident {
+        impl #declare_generics #builder_struct_ident #build_impl_block_generics {
+            #vis fn build(self) -> #ident #generics {
                 #ident {
                     #(#build_method_data),*
                 }
