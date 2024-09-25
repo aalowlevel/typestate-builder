@@ -5,7 +5,6 @@
 ## Table of Contents
 
 - [Features](#features)
-- [Installation](#installation)
 - [Usage](#usage)
   - [Deriving the Macro](#deriving-the-macro)
   - [Example](#example)
@@ -17,19 +16,10 @@
 ## Features
 
 - Enforced Typestate Pattern: Leveraging Rust's type system, the macro ensures that required fields are set before a struct can be created.
-- No Runtime Checks: The macro generates the necessary types and performs checks at compile time, eliminating the need for Option or Result types.
+- No Runtime Checks: The macro generates the necessary types and performs checks at compile time, eliminating the need for `Option` or `Result` types.
 - Compile-Time Safety: All required fields must be initialized before creating an instance of the struct, promoting safer code.
-- Support for Named and Tuple Structs: Works seamlessly with both named and tuple structs, with clear error messages for unsupported configurations.
+- Support for Named (and Tuple on the way) Structs: Works with named structs, with error messages for unsupported configurations.
 - Fluent and Intuitive Syntax: Offers a simple and idiomatic Rust syntax for creating builders, enhancing code readability and usability.
-
-## Installation
-
-To use `TypestateBuilder`, add the following to your `Cargo.toml`:
-
-```toml
-[dependencies]
-typestate-builder = "0.1"  # Replace with the latest version
-```
 
 ## Example
 
@@ -53,7 +43,7 @@ let person = Person::builder()
 println!("Created person: {:?}", person);
 ```
 
-In this example, the Person struct uses the `TypestateBuilder` derive macro to create a builder. Each field can be set in a fluent interface style, and the build method assembles the `Person` instance once all required fields have been set.
+In this example, the `Person` struct uses the `TypestateBuilder` derive macro to create a `builder`. Each field can be set in a fluent interface style, and the build method assembles the `Person` instance once all required fields have been set.
 
 ## How It Works
 
@@ -142,7 +132,7 @@ impl PersonBuilder<
 
 ## Limitations
 
-In fact, i really can't know (and no one will ever know) where is the final frontier of this crate. But i pasted [dozens complex structs here](https://github.com/aalowlevel/typestate-builder/blob/dev/src/lib.rs) to have them as for setting goals, not all of them can be expected to pass the tests. Therefore, it's impossible to give a guarantee in a universe where black can be found blacker: Just don't get too complicated OR send me a PR :').
+In fact, i really can't know (and no one will ever know) where is the final frontier of this crate. But i pasted [dozens complex structs here](https://github.com/aalowlevel/typestate-builder/blob/master/src/lib.rs) to have them as for setting goals, not all of them can be expected to pass the tests. Therefore, it's impossible to give a guarantee in a universe where black can be found blacker: Just don't get too complicated OR send me a PR :').
 
 ## License
 
