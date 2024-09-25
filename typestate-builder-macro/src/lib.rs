@@ -163,8 +163,7 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         // Extract generics
         let field_generics = check_type_for_generics(&field.ty, &generic_params_main);
         let field_generics_ts = if !field_generics.is_empty() {
-            let field_generics: Vec<_> =
-                field_generics.iter().map(|f| f.to_token_stream()).collect();
+            let field_generics = GenericParamKind::to_token_stream(&field_generics);
 
             /* 🛠️ WORKAROUND #WA96766639 The reason why result of `quote! { < #(#field_generics),* > }` is wrong like `'a>`` is unknown. */
             let field_generics = quote! { #(#field_generics),* };
@@ -261,28 +260,17 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         let mut declare_generics = Vec::new();
         let mut builder_generics = Vec::new();
 
-        // Where clause.
-        let builder_where_clause = where_clause_from_predicates(&field0.where_predicates);
-
         let mut builder_generics_res = Vec::new();
         let mut builder_data = Vec::new();
-
-        // Firstly, we must declare generics in field's type, if exist.
-        let field0_generics: Vec<_> = field0
-            .generics
-            .iter()
-            .map(|f| f.to_token_stream())
-            .collect();
-        declare_generics.extend(field0_generics.clone());
 
         for (i1, field1) in field_data.iter().enumerate() {
             let field1_name = field1.ident;
             let field1_titlecase = &field1.ident_titlecase;
 
+            // It's at the field.
             if i0 == i1 {
                 builder_generics.push(&field1.state_struct_empty);
-                builder_generics_res
-                    .push((&field1.state_struct_added, Some(field0_generics.clone())));
+                builder_generics_res.push((&field1.state_struct_added, Some(&field0.generics)));
                 builder_data.push(quote! { #field1_name: #field_struct_added  (#field1_name) });
             } else {
                 declare_generics.push(quote! { #field1_titlecase });
@@ -302,11 +290,20 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         } else {
             quote! {}
         };
+        let method_generics = if !field0.generics.is_empty() {
+            let method_generics = GenericParamKind::to_token_stream(&field0.generics);
+            quote! { < #(#method_generics),* > }
+        } else {
+            quote! {}
+        };
+
+        // Create generics part of the return type of the method.
         let builder_generics_res = if !builder_generics_res.is_empty() {
             let builder_generics_res = builder_generics_res
                 .into_iter()
                 .map(|(ty, ty_generics)| {
                     if let Some(ty_generics) = ty_generics {
+                        let ty_generics = GenericParamKind::to_token_stream(ty_generics);
                         quote! { #ty < #(#ty_generics),* > }
                     } else {
                         quote! { #ty }
@@ -318,9 +315,10 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
             quote! {}
         };
 
+        // Shape final impl block.
         builder_constructor_methods.push(quote! {
-            impl #declare_generics #builder_struct_ident #builder_generics #builder_where_clause {
-                #vis fn #field0_name(self, #field0_name: #field0_type) -> #builder_struct_ident #builder_generics_res {
+            impl #declare_generics #builder_struct_ident #builder_generics {
+                #vis fn #field0_name #method_generics (self, #field0_name: #field0_type) -> #builder_struct_ident #builder_generics_res {
                     #builder_struct_ident {
                         #(#builder_data),*
                     }
@@ -378,12 +376,15 @@ enum GenericParamKind<'a> {
 }
 
 impl<'a> GenericParamKind<'a> {
-    fn to_token_stream(&self) -> TokenStream2 {
-        match self {
-            GenericParamKind::Type(f) => quote! { #f },
-            GenericParamKind::Lifetime(f) => quote! { #f },
-            GenericParamKind::Const(f) => quote! { #f },
-        }
+    fn to_token_stream(generics: &Vec<GenericParamKind<'a>>) -> Vec<TokenStream2> {
+        generics
+            .iter()
+            .map(|f| match f {
+                GenericParamKind::Type(f) => quote! { #f },
+                GenericParamKind::Lifetime(f) => quote! { #f },
+                GenericParamKind::Const(f) => quote! { #f },
+            })
+            .collect()
     }
     fn from_generics(generics: &'a Generics) -> Vec<GenericParamKind<'a>> {
         generics
