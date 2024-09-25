@@ -39,11 +39,9 @@
 //!     .build();
 //! ```
 
-use std::collections::HashMap;
-
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use proc_macro_error::{emit_call_site_warning, proc_macro_error};
+use proc_macro_error::proc_macro_error;
 use quote::{format_ident, quote, ToTokens};
 use syn::{
     parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, GenericParam,
@@ -162,17 +160,8 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
 
         // Extract generics
         let field_generics = check_type_for_generics(&field.ty, &generic_params_main);
-        let field_generics_ts = if !field_generics.is_empty() {
-            let field_generics = GenericParamKind::to_token_stream(&field_generics);
-
-            /* 🛠️ WORKAROUND #WA96766639 The reason why result of `quote! { < #(#field_generics),* > }` is wrong like `'a>`` is unknown. */
-            let field_generics = quote! { #(#field_generics),* };
-            quote! {
-                < #field_generics >
-            }
-        } else {
-            quote! {}
-        };
+        let field_generics_ts =
+            create_generics_from_collection(&GenericParamKind::to_token_stream(&field_generics));
 
         // Associated where predicates.
         let where_predicates = where_clause_parsed.as_ref().map(|f| {
@@ -198,7 +187,7 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
             format_ident!("{}{}Empty", builder_struct_ident, field_ident_titlecase);
         let state_struct_added =
             format_ident!("{}{}Added", builder_struct_ident, field_ident_titlecase);
-        let where_clause = where_clause_from_predicates(&where_predicates);
+        let where_clause = create_where_clause_from_collection(&where_predicates);
         state_structs.push(quote! {
             struct #state_struct_added #field_generics_ts (#field_type) #where_clause;
             struct #state_struct_empty;
@@ -282,45 +271,27 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         }
 
         // Produce token stream of generics.
-        let declare_generics = if !declare_generics.is_empty() {
-            quote! { < #(#declare_generics),* > }
-        } else {
-            quote! {}
-        };
-        let builder_generics = if !builder_generics.is_empty() {
-            quote! { < #(#builder_generics),* >}
-        } else {
-            quote! {}
-        };
-        let method_generics = if !field0.generics.is_empty() {
-            let method_generics = GenericParamKind::to_token_stream(&field0.generics);
-            quote! { < #(#method_generics),* > }
-        } else {
-            quote! {}
-        };
-        let method_where_clause = if let Some(where_predicates) = &field0.where_predicates {
-            quote! { where #(#where_predicates),* }
-        } else {
-            quote! {}
-        };
+        let declare_generics = create_generics_from_collection(&declare_generics);
+        let builder_generics = create_generics_from_collection(&builder_generics);
+        let method_generics =
+            create_generics_from_collection(&GenericParamKind::to_token_stream(&field0.generics));
 
-        // Create generics part of the return type of the method.
-        let builder_generics_res = if !builder_generics_res.is_empty() {
-            let builder_generics_res = builder_generics_res
-                .into_iter()
-                .map(|(ty, ty_generics)| {
-                    if let Some(ty_generics) = ty_generics {
-                        let ty_generics = GenericParamKind::to_token_stream(ty_generics);
-                        quote! { #ty < #(#ty_generics),* > }
-                    } else {
-                        quote! { #ty }
-                    }
-                })
-                .collect::<Vec<_>>();
-            quote! { < #(#builder_generics_res),* >}
-        } else {
-            quote! {}
-        };
+        // Where clause for method.
+        let method_where_clause = create_where_clause_from_collection(&field0.where_predicates);
+
+        // Create generics part of the return type of the method.\
+        let builder_generics_res = builder_generics_res
+            .into_iter()
+            .map(|(ty, ty_generics)| {
+                if let Some(ty_generics) = ty_generics {
+                    let ty_generics = GenericParamKind::to_token_stream(ty_generics);
+                    quote! { #ty < #(#ty_generics),* > }
+                } else {
+                    quote! { #ty }
+                }
+            })
+            .collect::<Vec<_>>();
+        let builder_generics_res = create_generics_from_collection(&builder_generics_res);
 
         // Shape impl block.
         builder_constructor_methods.push(quote! {
@@ -334,12 +305,21 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         });
     }
 
+    // Build method.
+    let build_impl_block_generics = field_data
+        .iter()
+        .map(|f| &f.state_struct_added)
+        .collect::<Vec<_>>();
+    let build_method = quote! {
+        impl #builder_struct_ident  {}
+    };
+
     TypestateBuilderOutPut {
         state_structs,
         builder_struct,
         builder_method,
         builder_constructor_methods,
-        build_method: quote! {},
+        build_method,
     }
 }
 
@@ -383,7 +363,7 @@ enum GenericParamKind<'a> {
 }
 
 impl<'a> GenericParamKind<'a> {
-    fn to_token_stream(generics: &Vec<GenericParamKind<'a>>) -> Vec<TokenStream2> {
+    fn to_token_stream(generics: &[GenericParamKind<'a>]) -> Vec<TokenStream2> {
         generics
             .iter()
             .map(|f| match f {
@@ -494,7 +474,21 @@ fn parse_where_clause(where_clause: &WhereClause) -> Vec<(&Ident, &WherePredicat
     res
 }
 
-fn where_clause_from_predicates(where_predicates: &Option<Vec<&WherePredicate>>) -> TokenStream2 {
+fn create_generics_from_collection<T>(collection: &Vec<T>) -> TokenStream2
+where
+    T: ToTokens,
+{
+    if !collection.is_empty() {
+        quote! { < #(#collection),* > }
+    } else {
+        quote! {}
+    }
+}
+
+fn create_where_clause_from_collection<T>(where_predicates: &Option<Vec<T>>) -> TokenStream2
+where
+    T: ToTokens,
+{
     if let Some(where_predicates) = where_predicates {
         quote! { where #(#where_predicates),* }
     } else {
