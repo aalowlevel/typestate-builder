@@ -310,8 +310,22 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         .iter()
         .map(|f| &f.state_struct_added)
         .collect::<Vec<_>>();
+    let build_impl_block_generics = create_generics_from_collection(&build_impl_block_generics);
+    let build_method_data = field_data
+        .iter()
+        .map(|f| {
+            let field_name = f.ident;
+            quote! { #field_name: self.#field_name.0 }
+        })
+        .collect::<Vec<_>>();
     let build_method = quote! {
-        impl #builder_struct_ident  {}
+        impl #builder_struct_ident #build_impl_block_generics {
+            #vis fn build(self) -> #ident {
+                #ident {
+                    #(#build_method_data),*
+                }
+            }
+        }
     };
 
     TypestateBuilderOutPut {
