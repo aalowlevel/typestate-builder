@@ -6,14 +6,8 @@ authors = ["Andy Allison <rustacean15@gmail.com>"]
 description = "Derive-macro-based generator that combines `Typestate` and `Builder` patterns."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/aalowlevel/typestate-builder"
-keywords = ["derive", "pattern", "builder", "state", "typestate"]
-categories = [
-    "typestate",
-    "builder",
-    "pattern",
-    "code-generation",
-    "development-tools",
-]
+keywords = ["typestate", "builder", "pattern", "derive", "state"]
+categories = ["rust-patterns", "data-structures", "development-tools"]
 
 [dependencies]
 proc-macro2 = "1.0.86"
