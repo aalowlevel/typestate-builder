@@ -39,13 +39,15 @@
 //!     .build();
 //! ```
 
+use std::collections::HashMap;
+
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro_error::{emit_call_site_warning, proc_macro_error};
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use syn::{
-    parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, GenericParam, Ident,
-    Lifetime, Type,
+    parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, GenericParam,
+    Generics, Ident, Lifetime, Type, WhereClause, WherePredicate,
 };
 use titlecase::titlecase;
 
@@ -125,6 +127,7 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
     let ident = &input.ident;
     let generics = &input.generics;
     let where_clause = &generics.where_clause;
+    let where_clause_parsed = where_clause.as_ref().map(|f| parse_where_clause(f));
 
     // Ident for the builder struct.
     let builder_struct_ident = format_ident!("{}Builder", ident);
@@ -137,22 +140,13 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         state_struct_added: Ident,
         ty: &'a Type,
         generics: Vec<GenericParamKind<'a>>,
+        where_predicates: Option<Vec<&'a WherePredicate>>,
     }
     let mut field_data = Vec::new();
     let mut state_structs = Vec::new();
 
     // Extract generics of the main struct.
-    let generic_params_main: Vec<GenericParamKind> = generics
-        .params
-        .iter()
-        .map(|param| match param {
-            GenericParam::Type(type_param) => GenericParamKind::Type(&type_param.ident),
-            GenericParam::Lifetime(lifetime_def) => {
-                GenericParamKind::Lifetime(&lifetime_def.lifetime)
-            }
-            GenericParam::Const(const_param) => GenericParamKind::Const(&const_param.ident),
-        })
-        .collect();
+    let generic_params_main = GenericParamKind::from_generics(generics);
 
     // Iterate for state structs and to collect some data.
     for field in fields.named.iter() {
@@ -191,6 +185,17 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
             struct #state_struct_empty;
         });
 
+        // Associated where predicates.
+        let where_predicates = where_clause_parsed.as_ref().map(|f| {
+            let mut res = Vec::new();
+            for (wh_ident, predicate) in f {
+                if field_ident == *wh_ident {
+                    res.push(*predicate);
+                }
+            }
+            res
+        });
+
         field_data.push(FieldData {
             ident: field_ident,
             ident_titlecase: field_ident_titlecase,
@@ -198,6 +203,7 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
             state_struct_added,
             ty: field_type,
             generics: field_generics,
+            where_predicates,
         });
     }
 
@@ -245,6 +251,14 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
 
         let mut declare_generics = Vec::new();
         let mut builder_generics = Vec::new();
+
+        // Where clause.
+        let builder_where_clause = if let Some(where_predicates) = &field0.where_predicates {
+            quote! { where #(#where_predicates),* }
+        } else {
+            quote! {}
+        };
+
         let mut builder_generics_res = Vec::new();
         let mut builder_data = Vec::new();
 
@@ -300,7 +314,7 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         };
 
         builder_constructor_methods.push(quote! {
-            impl #declare_generics #builder_struct_ident #builder_generics {
+            impl #declare_generics #builder_struct_ident #builder_generics #builder_where_clause {
                 #vis fn #field0_name(self, #field0_name: #field0_type) -> #builder_struct_ident #builder_generics_res {
                     #builder_struct_ident {
                         #(#builder_data),*
@@ -358,13 +372,26 @@ enum GenericParamKind<'a> {
     Const(&'a Ident),
 }
 
-impl GenericParamKind<'_> {
+impl<'a> GenericParamKind<'a> {
     fn to_token_stream(&self) -> TokenStream2 {
         match self {
             GenericParamKind::Type(f) => quote! { #f },
             GenericParamKind::Lifetime(f) => quote! { #f },
             GenericParamKind::Const(f) => quote! { #f },
         }
+    }
+    fn from_generics(generics: &'a Generics) -> Vec<GenericParamKind<'a>> {
+        generics
+            .params
+            .iter()
+            .map(|param| match param {
+                GenericParam::Type(type_param) => GenericParamKind::Type(&type_param.ident),
+                GenericParam::Lifetime(lifetime_def) => {
+                    GenericParamKind::Lifetime(&lifetime_def.lifetime)
+                }
+                GenericParam::Const(const_param) => GenericParamKind::Const(&const_param.ident),
+            })
+            .collect()
     }
 }
 
@@ -436,4 +463,20 @@ fn check_type_for_generics<'a>(
     }
 
     generics_params_field
+}
+
+fn parse_where_clause(where_clause: &WhereClause) -> Vec<(&Ident, &WherePredicate)> {
+    let mut res = Vec::new();
+
+    for predicate in where_clause.predicates.iter() {
+        if let WherePredicate::Type(ty) = &predicate {
+            if let Type::Path(type_path) = &ty.bounded_ty {
+                if let Some(ident) = type_path.path.get_ident() {
+                    res.push((ident, predicate));
+                }
+            }
+        }
+    }
+
+    res
 }
