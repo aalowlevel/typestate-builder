@@ -1,21 +1,19 @@
 [package]
 name = "typestate-builder-macro"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Andy Allison <rustacean15@gmail.com>"]
 description = "Derive-macro-based generator that combines `Typestate` and `Builder` patterns."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/aalowlevel/typestate-builder"
-keywords = [
-    "rust",
-    "derive",
-    "pattern",
-    "macro",
-    "builder",
-    "state",
+keywords = ["derive", "pattern", "builder", "state", "typestate"]
+categories = [
     "typestate",
+    "builder",
+    "pattern",
+    "code-generation",
+    "development-tools",
 ]
-categories = ["pattern", "code-generation", "development-tools"]
 
 [dependencies]
 proc-macro2 = "1.0.86"
