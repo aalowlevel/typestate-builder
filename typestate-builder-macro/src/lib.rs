@@ -39,6 +39,8 @@
 //!     .build();
 //! ```
 
+use std::collections::HashSet;
+
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro_error::proc_macro_error;
@@ -47,7 +49,6 @@ use syn::{
     parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, GenericParam,
     Generics, Ident, Lifetime, Type, WhereClause, WherePredicate,
 };
-use titlecase::titlecase;
 
 /// Struct to hold the generated output of the `TypestateBuilder` macro.
 struct TypestateBuilderOutPut {
@@ -137,7 +138,7 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         state_struct_empty: Ident,
         state_struct_added: Ident,
         ty: &'a Type,
-        generics: Vec<GenericParamKind<'a>>,
+        generics: HashSet<GenericParamKind<'a>>,
         where_predicates: Option<Vec<&'a WherePredicate>>,
     }
     let mut field_data = Vec::new();
@@ -153,7 +154,9 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
             .ident
             .as_ref()
             .expect("field name of named struct cannot be `None`");
-        let field_ident_titlecase = format_ident!("{}", titlecase(&field_ident.to_string()));
+        let mut field_ident_str = field_ident.to_string();
+        to_title_case_in_place(&mut field_ident_str);
+        let field_ident_titlecase = format_ident!("{}", field_ident_str);
 
         // Type
         let field_type = &field.ty;
@@ -308,7 +311,8 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
     }
 
     // Build method.
-    let mut declare_generics = Vec::new();
+    let mut declare_generics = HashSet::new();
+    declare_generics.extend(generic_params_main.clone());
     let build_impl_block_generics = field_data
         .iter()
         .map(|f| {
@@ -380,7 +384,7 @@ fn generate_unit_struct_code(input: &DeriveInput) -> TypestateBuilderOutPut {
     todo!()
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 enum GenericParamKind<'a> {
     Type(&'a Ident),
     Lifetime(&'a Lifetime),
@@ -388,7 +392,7 @@ enum GenericParamKind<'a> {
 }
 
 impl<'a> GenericParamKind<'a> {
-    fn to_token_stream(generics: &[GenericParamKind<'a>]) -> Vec<TokenStream2> {
+    fn to_token_stream(generics: &HashSet<GenericParamKind<'a>>) -> Vec<TokenStream2> {
         generics
             .iter()
             .map(|f| match f {
@@ -398,7 +402,7 @@ impl<'a> GenericParamKind<'a> {
             })
             .collect()
     }
-    fn from_generics(generics: &'a Generics) -> Vec<GenericParamKind<'a>> {
+    fn from_generics(generics: &'a Generics) -> HashSet<GenericParamKind<'a>> {
         generics
             .params
             .iter()
@@ -414,10 +418,10 @@ impl<'a> GenericParamKind<'a> {
 }
 
 fn check_type_for_generics<'a>(
-    ty: &Type,
-    generic_params_main: &[GenericParamKind<'a>],
-) -> Vec<GenericParamKind<'a>> {
-    let mut generics_params_field = Vec::new();
+    ty: &'a Type,
+    generic_params_main: &'a HashSet<GenericParamKind<'a>>,
+) -> HashSet<GenericParamKind<'a>> {
+    let mut generics_params_field = HashSet::new();
 
     match ty {
         // Handles cases like T
@@ -430,7 +434,7 @@ fn check_type_for_generics<'a>(
                     }
                     _ => false,
                 }) {
-                    generics_params_field.push(param.clone());
+                    generics_params_field.insert(param.clone());
                 }
 
                 // Handle nested generics like Option<T>
@@ -450,7 +454,7 @@ fn check_type_for_generics<'a>(
                                     GenericParamKind::Lifetime(lt) => *lt == lifetime,
                                     _ => false,
                                 }) {
-                                    generics_params_field.push(param.clone());
+                                    generics_params_field.insert(param.clone());
                                 }
                             }
                             _ => {}
@@ -468,7 +472,7 @@ fn check_type_for_generics<'a>(
                     GenericParamKind::Lifetime(lt) => *lt == lifetime,
                     _ => false,
                 }) {
-                    generics_params_field.push(param.clone());
+                    generics_params_field.insert(param.clone());
                 }
             }
 
@@ -518,5 +522,45 @@ where
         quote! { where #(#where_predicates),* }
     } else {
         quote! {}
+    }
+}
+/// Modifies the input string buffer in-place by converting it to title case.
+/// It capitalizes the first letter of each word without changing the case of other letters.
+///
+/// # Arguments
+///
+/// * `buffer` - A mutable reference to a `String` that will be modified.
+///
+/// # Example
+///
+/// ```
+/// let mut buffer = String::from("hello WORLD from rust");
+/// to_title_case_in_place(&mut buffer);
+/// assert_eq!(buffer, "Hello WORLD From Rust");
+/// ```
+fn to_title_case_in_place(buffer: &mut String) {
+    let mut capitalize_next = true;
+
+    // Convert the string into a vector of characters to allow in-place mutation.
+    let chars: Vec<char> = buffer.chars().collect();
+
+    // Clear the original string to reuse its memory.
+    buffer.clear();
+
+    for c in chars {
+        if c.is_whitespace() {
+            // Add the whitespace as is and mark the next character for capitalization.
+            buffer.push(c);
+            capitalize_next = true;
+        } else if c == '_' {
+            capitalize_next = true;
+        } else if capitalize_next {
+            // Capitalize the first character of the word and reset the flag.
+            buffer.push(c.to_uppercase().next().unwrap());
+            capitalize_next = false;
+        } else {
+            // Append the character without changing its case.
+            buffer.push(c);
+        }
     }
 }
