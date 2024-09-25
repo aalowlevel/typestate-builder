@@ -334,7 +334,7 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         })
         .collect::<Vec<_>>();
     let build_method = quote! {
-        impl #declare_generics #builder_struct_ident #build_impl_block_generics {
+        impl #declare_generics #builder_struct_ident #build_impl_block_generics #where_clause {
             #vis fn build(self) -> #ident #generics {
                 #ident {
                     #(#build_method_data),*
@@ -364,8 +364,8 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
 /// A `TypestateBuilderOutPut` struct containing the generated state structs,
 /// builder struct, builder methods, and the build method for the tuple struct.
 fn generate_tuple_struct_code(
-    input: &DeriveInput,
-    fields: &FieldsUnnamed,
+    _input: &DeriveInput,
+    _fields: &FieldsUnnamed,
 ) -> TypestateBuilderOutPut {
     todo!()
 }
@@ -380,7 +380,7 @@ fn generate_tuple_struct_code(
 ///
 /// A `TypestateBuilderOutPut` struct containing the generated state structs,
 /// builder struct, builder methods, and the build method for the unit struct.
-fn generate_unit_struct_code(input: &DeriveInput) -> TypestateBuilderOutPut {
+fn generate_unit_struct_code(_input: &DeriveInput) -> TypestateBuilderOutPut {
     todo!()
 }
 
