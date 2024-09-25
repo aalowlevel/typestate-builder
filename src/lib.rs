@@ -18,7 +18,11 @@
 #[cfg(test)]
 #[allow(dead_code)]
 mod tests {
-    use std::{collections::HashMap, marker::PhantomData};
+    use std::{
+        alloc::{GlobalAlloc, Layout},
+        collections::HashMap,
+        marker::PhantomData,
+    };
 
     use typestate_builder_macro::TypestateBuilder;
 
@@ -265,6 +269,140 @@ mod tests {
     {
         fn get_value(&self) -> T {
             *self.value
+        }
+    }
+
+    trait Functor {
+        type Wrapped<'a, T>: Functor;
+
+        fn fmap<'a, T, U>(f: impl Fn(T) -> U, x: Self::Wrapped<'a, T>) -> Self::Wrapped<'a, U>;
+    }
+
+    #[derive(TypestateBuilder)]
+    struct Tree<'a, T, U>
+    where
+        T: 'a + Clone,
+        U: 'a + Clone,
+    {
+        value: &'a T,
+        children: Vec<Tree<'a, U, T>>,
+    }
+
+    impl<'a, T, U> Tree<'a, T, U>
+    where
+        T: 'a + Clone,
+        U: 'a + Clone,
+    {
+        fn new(value: &'a T) -> Self {
+            Tree {
+                value,
+                children: Vec::new(),
+            }
+        }
+
+        fn add_child(&mut self, child: Tree<'a, U, T>) {
+            self.children.push(child);
+        }
+    }
+
+    #[derive(Clone, TypestateBuilder)]
+    struct SelfReferential<T>
+    where
+        T: Clone,
+    {
+        value: T,
+        next: Option<Box<SelfReferential<Self>>>,
+    }
+
+    impl<T> SelfReferential<T>
+    where
+        T: Clone,
+    {
+        fn new(value: T) -> Self {
+            SelfReferential { value, next: None }
+        }
+
+        fn set_next(&mut self, next: SelfReferential<Self>) {
+            self.next = Some(Box::new(next));
+        }
+    }
+
+    #[derive(TypestateBuilder)]
+    struct ComplexGraph<'a, N, E>
+    where
+        N: 'a,
+        E: 'a,
+    {
+        nodes: Vec<N>,
+        edges: Vec<(N, N, E)>,
+        _marker: PhantomData<&'a ()>,
+    }
+
+    #[derive(TypestateBuilder)]
+    struct OptionWrapper<T, const IS_SOME: bool> {
+        value: Option<T>,
+    }
+
+    impl<T> OptionWrapper<T, true> {
+        fn new(value: T) -> Self {
+            OptionWrapper { value: Some(value) }
+        }
+
+        fn get(&self) -> &T {
+            self.value.as_ref().unwrap()
+        }
+    }
+
+    impl<T> OptionWrapper<T, false> {
+        fn new_none() -> Self {
+            OptionWrapper { value: None }
+        }
+    }
+
+    #[derive(TypestateBuilder)]
+    struct DeeplyNested<'a, 'b, T, U>
+    where
+        T: 'a + Copy,
+        U: 'b + Clone,
+    {
+        level_one: &'a T,
+        level_two: &'b U,
+        sub_nested: Vec<&'a DeeplyNested<'a, 'b, T, U>>,
+    }
+
+    impl<'a, 'b, T, U> DeeplyNested<'a, 'b, T, U>
+    where
+        T: 'a + Copy,
+        U: 'b + Clone,
+    {
+        fn new(level_one: &'a T, level_two: &'b U) -> Self {
+            DeeplyNested {
+                level_one,
+                level_two,
+                sub_nested: Vec::new(),
+            }
+        }
+
+        fn add_nested(&mut self, nested: &'a DeeplyNested<'a, 'b, T, U>) {
+            self.sub_nested.push(nested);
+        }
+    }
+
+    #[derive(TypestateBuilder)]
+    struct CustomAllocator<T, A: GlobalAlloc> {
+        allocator: A,
+        data: *mut T,
+    }
+
+    impl<T, A: GlobalAlloc> CustomAllocator<T, A> {
+        fn allocate(&mut self) -> *mut T {
+            let layout = Layout::new::<T>();
+            unsafe { self.allocator.alloc(layout) as *mut T }
+        }
+
+        fn deallocate(&mut self, ptr: *mut T) {
+            let layout = Layout::new::<T>();
+            unsafe { self.allocator.dealloc(ptr as *mut u8, layout) }
         }
     }
 }
