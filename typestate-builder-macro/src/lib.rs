@@ -175,25 +175,34 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
             quote! {}
         };
 
+        // Associated where predicates.
+        let where_predicates = where_clause_parsed.as_ref().map(|f| {
+            let mut field_predicates = Vec::new();
+            for (wh_ident, predicate) in f {
+                for field_generic in field_generics.iter() {
+                    match field_generic {
+                        GenericParamKind::Type(fgi) => {
+                            if fgi == wh_ident {
+                                field_predicates.push(*predicate);
+                            }
+                        }
+                        GenericParamKind::Lifetime(_) => unimplemented!(),
+                        GenericParamKind::Const(_) => unimplemented!(),
+                    }
+                }
+            }
+            field_predicates
+        });
+
         // State structs
         let state_struct_empty =
             format_ident!("{}{}Empty", builder_struct_ident, field_ident_titlecase);
         let state_struct_added =
             format_ident!("{}{}Added", builder_struct_ident, field_ident_titlecase);
+        let where_clause = where_clause_from_predicates(&where_predicates);
         state_structs.push(quote! {
-            struct #state_struct_added #field_generics_ts (#field_type);
+            struct #state_struct_added #field_generics_ts (#field_type) #where_clause;
             struct #state_struct_empty;
-        });
-
-        // Associated where predicates.
-        let where_predicates = where_clause_parsed.as_ref().map(|f| {
-            let mut res = Vec::new();
-            for (wh_ident, predicate) in f {
-                if field_ident == *wh_ident {
-                    res.push(*predicate);
-                }
-            }
-            res
         });
 
         field_data.push(FieldData {
@@ -253,11 +262,7 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         let mut builder_generics = Vec::new();
 
         // Where clause.
-        let builder_where_clause = if let Some(where_predicates) = &field0.where_predicates {
-            quote! { where #(#where_predicates),* }
-        } else {
-            quote! {}
-        };
+        let builder_where_clause = where_clause_from_predicates(&field0.where_predicates);
 
         let mut builder_generics_res = Vec::new();
         let mut builder_data = Vec::new();
@@ -479,4 +484,12 @@ fn parse_where_clause(where_clause: &WhereClause) -> Vec<(&Ident, &WherePredicat
     }
 
     res
+}
+
+fn where_clause_from_predicates(where_predicates: &Option<Vec<&WherePredicate>>) -> TokenStream2 {
+    if let Some(where_predicates) = where_predicates {
+        quote! { where #(#where_predicates),* }
+    } else {
+        quote! {}
+    }
 }
