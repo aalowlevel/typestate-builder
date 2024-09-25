@@ -13,7 +13,7 @@
 
 use typestate_builder_macro::TypestateBuilder;
 
-#[derive(TypestateBuilder)]
+#[derive(Debug, TypestateBuilder)]
 pub struct Person {
     name: String,
     age: u32,
@@ -21,5 +21,11 @@ pub struct Person {
 }
 
 fn main() {
-    // let person = PersonBuilderNameAdded;
+    let person = Person::builder()
+        .name("Alice Johnson".to_string())
+        .age(30)
+        .email(None)
+        .build();
+
+    println!("{:?}", person);
 }

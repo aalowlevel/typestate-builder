@@ -146,7 +146,7 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
     // Extract generics of the main struct.
     let generic_params_main = GenericParamKind::from_generics(generics);
 
-    // Iterate for state structs and to collect some data.
+    // Iterate to collect some data.
     for field in fields.named.iter() {
         // Ident
         let field_ident = field
@@ -260,12 +260,12 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
             // It's at the field.
             if i0 == i1 {
                 builder_generics.push(&field1.state_struct_empty);
-                builder_generics_res.push((&field1.state_struct_added, Some(&field0.generics)));
+                builder_generics_res.push((&field1.state_struct_added, true));
                 builder_data.push(quote! { #field1_name: #field_struct_added  (#field1_name) });
             } else {
                 declare_generics.push(quote! { #field1_titlecase });
                 builder_generics.push(field1_titlecase);
-                builder_generics_res.push((field1_titlecase, None));
+                builder_generics_res.push((field1_titlecase, false));
                 builder_data.push(quote! { #field1_name: self.#field1_name });
             }
         }
@@ -279,13 +279,15 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         // Where clause for method.
         let method_where_clause = create_where_clause_from_collection(&field0.where_predicates);
 
-        // Create generics part of the return type of the method.\
+        // Create generics part of the return type of the method.
         let builder_generics_res = builder_generics_res
             .into_iter()
-            .map(|(ty, ty_generics)| {
-                if let Some(ty_generics) = ty_generics {
-                    let ty_generics = GenericParamKind::to_token_stream(ty_generics);
-                    quote! { #ty < #(#ty_generics),* > }
+            .map(|(ty, is_added)| {
+                if is_added {
+                    let ty_generics = create_generics_from_collection(
+                        &GenericParamKind::to_token_stream(&field0.generics),
+                    );
+                    quote! { #ty #ty_generics }
                 } else {
                     quote! { #ty }
                 }
