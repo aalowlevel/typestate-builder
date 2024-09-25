@@ -263,6 +263,7 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         let mut builder_generics_res = Vec::new();
         let mut builder_data = Vec::new();
 
+        // Loop the same structure again to get extra info.
         for (i1, field1) in field_data.iter().enumerate() {
             let field1_name = field1.ident;
             let field1_titlecase = &field1.ident_titlecase;
@@ -280,6 +281,7 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
             }
         }
 
+        // Produce token stream of generics.
         let declare_generics = if !declare_generics.is_empty() {
             quote! { < #(#declare_generics),* > }
         } else {
@@ -293,6 +295,11 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
         let method_generics = if !field0.generics.is_empty() {
             let method_generics = GenericParamKind::to_token_stream(&field0.generics);
             quote! { < #(#method_generics),* > }
+        } else {
+            quote! {}
+        };
+        let method_where_clause = if let Some(where_predicates) = &field0.where_predicates {
+            quote! { where #(#where_predicates),* }
         } else {
             quote! {}
         };
@@ -315,10 +322,10 @@ fn generate_named_struct_code(input: &DeriveInput, fields: &FieldsNamed) -> Type
             quote! {}
         };
 
-        // Shape final impl block.
+        // Shape impl block.
         builder_constructor_methods.push(quote! {
             impl #declare_generics #builder_struct_ident #builder_generics {
-                #vis fn #field0_name #method_generics (self, #field0_name: #field0_type) -> #builder_struct_ident #builder_generics_res {
+                #vis fn #field0_name #method_generics (self, #field0_name: #field0_type) -> #builder_struct_ident #builder_generics_res #method_where_clause {
                     #builder_struct_ident {
                         #(#builder_data),*
                     }
