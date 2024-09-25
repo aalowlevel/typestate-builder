@@ -18,4 +18,4 @@ keywords = [
 categories = ["pattern", "code-generation", "development-tools"]
 
 [dependencies]
-typestate-builder-macro = { path = "./typestate-builder-macro" }
+typestate-builder-macro = { path = "./typestate-builder-macro", version = "0.1.0" }
