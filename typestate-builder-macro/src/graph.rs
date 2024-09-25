@@ -579,6 +579,7 @@ impl Serialize for BuilderStateAdded {
         res.end()
     }
 }
+/* ♻️ REFACTOR #RF68720005 Remove option from filter_edge. */
 pub fn traverse<'a, N, E, F, R>(
     graph: &'a Graph<N, E>,
     filter_edge: Option<&'a [&'a E]>,

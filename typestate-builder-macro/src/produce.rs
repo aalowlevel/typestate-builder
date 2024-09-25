@@ -684,6 +684,69 @@ mod builder_build_impl {
             panic!("{}", msg::node::TYPE);
         };
 
+        let generics = map.get(mapkey::startp::GENERICS).map(|start| {
+            let generics = traverse(
+                graph,
+                Some(&[&StructRelation::GenericTrain]),
+                *start,
+                true,
+                |graph, _edge, node_generic| {
+                    let StructElement::Generic(generic) = &graph[node_generic] else {
+                        panic!("{}", msg::node::GENERIC);
+                    };
+                    Rc::clone(&generic.syn)
+                },
+            );
+            if !generics.is_empty() {
+                let mut first = Vec::with_capacity(generics.len());
+                let mut second = Vec::with_capacity(generics.len());
+                for generic in generics {
+                    first.push(quote! { #generic });
+                    match generic.as_ref() {
+                        syn::GenericParam::Lifetime(lifetime_param) => {
+                            let lt = &lifetime_param.lifetime;
+                            second.push(quote! { #lt });
+                        }
+                        syn::GenericParam::Type(type_param) => {
+                            let ident = &type_param.ident;
+                            second.push(quote! { #ident });
+                        }
+                        syn::GenericParam::Const(const_param) => {
+                            let ident = &const_param.ident;
+                            second.push(quote! { #ident });
+                        }
+                    }
+                }
+                (quote! { <#(#first),*> }, quote! { <#(#second),*> })
+            } else {
+                (quote! {}, quote! {})
+            }
+        });
+        let (gfirst, gsecond) = match generics {
+            Some((gfirst, gsecond)) => (Some(gfirst), Some(gsecond)),
+            None => (None, None),
+        };
+
+        let where_clause = map.get(mapkey::startp::WP).map(|start| {
+            let wp = traverse(
+                graph,
+                Some(&[&StructRelation::WherePredicateTrain]),
+                *start,
+                true,
+                |graph, _edge, node_wp| {
+                    let StructElement::WherePredicate(wp) = &graph[node_wp] else {
+                        panic!("{}", msg::node::WP);
+                    };
+                    Rc::clone(&wp.syn)
+                },
+            );
+            if !wp.is_empty() {
+                quote! { where #(#wp),* }
+            } else {
+                quote! {}
+            }
+        });
+
         let collections = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
             let mut fields = Vec::new();
             let mut addeds = Vec::new();
@@ -717,9 +780,15 @@ mod builder_build_impl {
             let addeds = if !addeds.is_empty() {
                 let addeds = addeds
                     .into_iter()
-                    .map(|f| {
-                        let ident = &f.ident;
-                        quote! { #ident }
+                    .map(|added| {
+                        let ident = &added.ident;
+                        let generics = if !added.generics.is_empty() {
+                            let generics = &added.generics;
+                            quote! { <#(#generics),*> }
+                        } else {
+                            quote! {}
+                        };
+                        quote! { #ident #generics }
                     })
                     .collect::<Vec<_>>();
                 quote! { <#(#addeds),*> }
@@ -732,8 +801,8 @@ mod builder_build_impl {
         match (ty, collections) {
             (StructType::Named, Some((fields, addeds))) => {
                 quote! {
-                    impl #builder_ident #addeds {
-                        #vis fn build(self) -> #ident {
+                    impl #gfirst #builder_ident #addeds #where_clause {
+                        #vis fn build(self) -> #ident #gsecond {
                             #ident {
                                 #(#fields),*
                             }
@@ -743,8 +812,8 @@ mod builder_build_impl {
             }
             (StructType::Unnamed, Some((fields, addeds))) => {
                 quote! {
-                    impl #builder_ident #addeds {
-                        #vis fn build(self) -> #ident {
+                    impl #gfirst #builder_ident #addeds #where_clause {
+                        #vis fn build(self) -> #ident #gsecond {
                             #ident ( #(#fields),* )
                         }
                     }
