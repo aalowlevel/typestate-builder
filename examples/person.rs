@@ -15,7 +15,7 @@
 
 use typestate_builder::TypestateBuilder;
 
-#[derive(Debug, TypestateBuilder)]
+#[derive(TypestateBuilder)]
 pub struct Person {
     name: String,
     age: u32,
@@ -23,11 +23,11 @@ pub struct Person {
 }
 
 fn main() {
-    let person = Person::builder()
-        .name("Alice Johnson".to_string())
-        .age(30)
-        .email(None)
-        .build();
+    // let person = Person::builder()
+    //     .name("Alice Johnson".to_string())
+    //     .age(30)
+    //     .email(None)
+    //     .build();
 
-    println!("{:?}", person);
+    // println!("{:?}", person);
 }

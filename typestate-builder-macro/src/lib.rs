@@ -11,8 +11,6 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-#![warn(missing_docs)]
-
 //! This crate provides the `TypestateBuilder` derive macro for generating a
 //! typestate-pattern builder for structs.
 //!
@@ -38,6 +36,12 @@
 //!     .email(Some("alice@example.com".to_string()))
 //!     .build();
 //! ```
+
+#![warn(missing_docs)]
+#![allow(unused)]
+
+mod analysis;
+mod output;
 
 use std::collections::HashSet;
 
@@ -77,37 +81,44 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     // Parse the input token stream into a `DeriveInput` structure.
     let input = parse_macro_input!(input as DeriveInput);
 
-    // Match the type of struct and generate the appropriate builder code.
-    let TypestateBuilderOutPut {
-        state_structs,
-        builder_struct,
-        builder_method,
-        builder_constructor_methods,
-        build_method,
-    } = match &input.data {
-        // Handle named field structs.
-        Data::Struct(data) => match &data.fields {
-            Fields::Named(fields) => generate_named_struct_code(&input, fields),
-            // Handle tuple structs (structs with unnamed fields).
-            Fields::Unnamed(fields) => generate_tuple_struct_code(&input, fields),
-            // Handle unit structs (structs with no fields).
-            Fields::Unit => generate_unit_struct_code(&input),
-        },
-        // Panic if applied to anything other than a struct.
+    // Firstly, we need to analyze input data.
+    match &input.data {
+        Data::Struct(data_struct) => analysis::data_struct(data_struct),
         _ => panic!("TypestateBuilder only supports structs"),
-    };
+    }
 
-    // Combine the generated code into a final token stream.
-    let output = quote! {
-        #(#state_structs)*
-        #builder_struct
-        #builder_method
-        #(#builder_constructor_methods)*
-        #build_method
-    };
+    // Match the type of struct and generate the appropriate builder code.
+    // let TypestateBuilderOutPut {
+    //     state_structs,
+    //     builder_struct,
+    //     builder_method,
+    //     builder_constructor_methods,
+    //     build_method,
+    // } = match &input.data {
+    //     // Handle named field structs.
+    //     Data::Struct(data) => match &data.fields {
+    //         Fields::Named(fields) => generate_named_struct_code(&input, fields),
+    //         // Handle tuple structs (structs with unnamed fields).
+    //         Fields::Unnamed(fields) => generate_tuple_struct_code(&input, fields),
+    //         // Handle unit structs (structs with no fields).
+    //         Fields::Unit => generate_unit_struct_code(&input),
+    //     },
+    //     // Panic if applied to anything other than a struct.
+    //     _ => panic!("TypestateBuilder only supports structs"),
+    // };
 
-    // Return the generated code.
-    output.into()
+    // // Combine the generated code into a final token stream.
+    // let output = quote! {
+    //     #(#state_structs)*
+    //     #builder_struct
+    //     #builder_method
+    //     #(#builder_constructor_methods)*
+    //     #build_method
+    // };
+
+    // // Return the generated code.
+    // output.into()
+    quote! {}.into()
 }
 
 /// Generates the builder code for structs with named fields.
