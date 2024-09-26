@@ -22,12 +22,32 @@ enum StructElement<'a> {
 impl<'a> std::fmt::Debug for StructElement<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Attrs(attrs) => f.debug_tuple("Attrs").field(attrs).finish(),
-            Self::Vis(arg0) => f.debug_tuple("Vis").field(arg0).finish(),
-            Self::Ident(arg0) => f.debug_tuple("Ident").field(arg0).finish(),
-            Self::GenLifetimes(arg0) => f.debug_tuple("GenLifetimes").field(arg0).finish(),
-            Self::GenConsts(arg0) => f.debug_tuple("GenConsts").field(arg0).finish(),
-            Self::GenTypes(arg0) => f.debug_tuple("GenTypes").field(arg0).finish(),
+            Self::Attrs(attrs) => {
+                for attr in attrs {
+                    write!(f, "{}", syn_element_to_string(attr))?;
+                }
+                Ok(())
+            }
+            Self::Vis(visibility) => write!(f, "{}", syn_element_to_string(visibility)),
+            Self::Ident(ident) => write!(f, "{}", syn_element_to_string(ident)),
+            Self::GenLifetimes(lifetimes) => {
+                for lifetime in lifetimes {
+                    write!(f, "{}", syn_element_to_string(lifetime))?;
+                }
+                Ok(())
+            }
+            Self::GenConsts(const_params) => {
+                for const_param in const_params {
+                    write!(f, "{}", syn_element_to_string(const_param))?;
+                }
+                Ok(())
+            }
+            Self::GenTypes(type_params) => {
+                for type_param in type_params {
+                    write!(f, "{}", syn_element_to_string(type_param))?;
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -69,4 +89,11 @@ fn write_graph_to_file(
     let mut file = File::create(filename)?;
     file.write_all(dot.as_bytes())?;
     Ok(())
+}
+
+fn syn_element_to_string<E>(element: &E) -> String
+where
+    E: ToTokens,
+{
+    element.to_token_stream().to_string()
 }
