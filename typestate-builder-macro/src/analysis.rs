@@ -23,30 +23,54 @@ impl<'a> std::fmt::Debug for StructElement<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Attrs(attrs) => {
-                for attr in attrs {
+                write!(f, "Attrs(")?;
+                for (i, attr) in attrs.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", syn_element_to_string(attr))?;
                 }
-                Ok(())
+                write!(f, ")")
             }
-            Self::Vis(visibility) => write!(f, "{}", syn_element_to_string(visibility)),
-            Self::Ident(ident) => write!(f, "{}", syn_element_to_string(ident)),
+            Self::Vis(visibility) => {
+                write!(f, "Vis(")?;
+                write!(f, "{}", syn_element_to_string(visibility))?;
+                write!(f, ")")
+            }
+            Self::Ident(ident) => {
+                write!(f, "Ident(")?;
+                write!(f, "{}", syn_element_to_string(ident))?;
+                write!(f, ")")
+            }
             Self::GenLifetimes(lifetimes) => {
-                for lifetime in lifetimes {
+                write!(f, "GenLifetimes(")?;
+                for (i, lifetime) in lifetimes.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", syn_element_to_string(lifetime))?;
                 }
-                Ok(())
+                write!(f, ")")
             }
             Self::GenConsts(const_params) => {
-                for const_param in const_params {
+                write!(f, "GenConsts(")?;
+                for (i, const_param) in const_params.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", syn_element_to_string(const_param))?;
                 }
-                Ok(())
+                write!(f, ")")
             }
             Self::GenTypes(type_params) => {
-                for type_param in type_params {
+                write!(f, "GenTypes(")?;
+                for (i, type_param) in type_params.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", syn_element_to_string(type_param))?;
                 }
-                Ok(())
+                write!(f, ")")
             }
         }
     }

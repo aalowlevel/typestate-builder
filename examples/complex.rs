@@ -3,7 +3,7 @@
 use typestate_builder::TypestateBuilder;
 
 #[derive(TypestateBuilder)]
-struct MultiBoundGeneric<T, U>
+pub struct MultiBoundGeneric<'a, T, U, const L: usize>
 where
     T: Clone + Default + std::fmt::Debug,
     U: Into<String> + Copy,
@@ -11,6 +11,8 @@ where
     item1: T,
     item2: U,
     data: Vec<T>,
+    borrowed: &'a str,
+    consted: [u32; L],
 }
 
 fn main() {}
