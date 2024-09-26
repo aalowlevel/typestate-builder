@@ -21,7 +21,6 @@
 ## Table of Contents
 
 - [Features](#features)
-- [Installation](#installation)
 - [Usage](#usage)
   - [Deriving the Macro](#deriving-the-macro)
   - [Example](#example)
@@ -37,15 +36,6 @@
 - Compile-Time Safety: All required fields must be initialized before creating an instance of the struct, promoting safer code.
 - Support for Named and Tuple Structs: Works seamlessly with both named and tuple structs, with clear error messages for unsupported configurations.
 - Fluent and Intuitive Syntax: Offers a simple and idiomatic Rust syntax for creating builders, enhancing code readability and usability.
-
-## Installation
-
-To use `TypestateBuilder`, add the following to your `Cargo.toml`:
-
-```toml
-[dependencies]
-typestate-builder = "0.1"  # Replace with the latest version
-```
 
 ## Example
 
