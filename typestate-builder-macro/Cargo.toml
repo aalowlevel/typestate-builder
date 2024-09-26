@@ -14,6 +14,7 @@ proc-macro2 = "1.0.86"
 quote = "1.0.37"
 syn = { version = "2.0.77", features = ["full"] }
 proc-macro-error = "1.0.4"
+petgraph = "0.6.5"
 
 [lib]
 proc-macro = true

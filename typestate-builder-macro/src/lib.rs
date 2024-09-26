@@ -82,10 +82,7 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     // Firstly, we need to analyze input data.
-    match &input.data {
-        Data::Struct(data_struct) => analysis::data_struct(data_struct),
-        _ => panic!("TypestateBuilder only supports structs"),
-    }
+    analysis::init(input);
 
     // Match the type of struct and generate the appropriate builder code.
     // let TypestateBuilderOutPut {
