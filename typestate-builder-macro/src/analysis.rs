@@ -1,4 +1,5 @@
 pub mod element;
+pub mod relation;
 
 use std::{collections::HashSet, fs::File, io::Write};
 
@@ -9,15 +10,11 @@ use petgraph::{
 };
 use proc_macro_error::emit_call_site_warning;
 use quote::ToTokens;
+use relation::StructRelation;
 use syn::{
     Attribute, ConstParam, Data, DataStruct, DeriveInput, Fields, FieldsNamed, Ident,
     LifetimeParam, TypeParam, Visibility,
 };
-
-#[derive(Debug)]
-enum StructRelation {
-    GenLeftToRight,
-}
 
 pub fn init(input: DeriveInput) {
     let Data::Struct(data_struct) = input.data else {
@@ -25,23 +22,24 @@ pub fn init(input: DeriveInput) {
     };
 
     let mut graph = Graph::<StructElement, StructRelation>::new();
-    let mut node_indices = HashSet::new();
 
     // Basic
-    node_indices.insert(graph.add_node(StructElement::Attrs(input.attrs)));
-    node_indices.insert(graph.add_node(StructElement::Vis(input.vis)));
-    node_indices.insert(graph.add_node(StructElement::Ident(input.ident)));
+    graph.add_node(StructElement::Attrs(input.attrs));
+    graph.add_node(StructElement::Vis(input.vis));
+    graph.add_node(StructElement::Ident(input.ident));
 
     // Generics
-    node_indices.insert(graph.add_node(StructElement::GenLifetimes(
+    let n_lifetimes = graph.add_node(StructElement::GenLifetimes(
         input.generics.lifetimes().collect(),
-    )));
-    node_indices.insert(graph.add_node(StructElement::GenConsts(
+    ));
+    let n_consts = graph.add_node(StructElement::GenConsts(
         input.generics.const_params().collect(),
-    )));
-    node_indices.insert(graph.add_node(StructElement::GenTypes(
+    ));
+    graph.add_edge(n_lifetimes, n_consts, StructRelation::GenLeftToRight);
+    let n_types = graph.add_node(StructElement::GenTypes(
         input.generics.type_params().collect(),
-    )));
+    ));
+    graph.add_edge(n_consts, n_types, StructRelation::GenLeftToRight);
 
     write_graph_to_file(&graph, "example.dot");
 }
