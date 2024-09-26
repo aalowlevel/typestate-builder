@@ -3,7 +3,7 @@
 use typestate_builder::TypestateBuilder;
 
 #[derive(TypestateBuilder)]
-pub struct MultiBoundGeneric<'a, T, U, const L: usize>
+pub struct MultiBoundGeneric<'a, T, const L: usize, U>
 where
     T: Clone + Default + std::fmt::Debug,
     U: Into<String> + Copy,
