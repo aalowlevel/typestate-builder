@@ -11,7 +11,7 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 use proc_macro_error::emit_call_site_warning;
@@ -51,9 +51,9 @@ fn bind_field_generics(
 
 #[derive(Debug, Default)]
 struct FieldElements<'a> {
-    idents: Vec<&'a Ident>,
-    lifetimes: Vec<&'a Lifetime>,
-    const_params: Vec<&'a Ident>,
+    idents: HashSet<&'a Ident>,
+    lifetimes: HashSet<&'a Lifetime>,
+    const_params: HashSet<&'a Ident>,
 }
 
 impl<'a> FieldElements<'a> {
@@ -64,11 +64,11 @@ impl<'a> FieldElements<'a> {
                 // Handle const generic in array length
                 if let Expr::Path(expr_path) = &type_array.len {
                     if let Some(ident) = expr_path.path.get_ident() {
-                        self.const_params.push(ident);
+                        self.const_params.insert(ident);
                     } else {
                         // Handle multi-segment paths
                         for segment in &expr_path.path.segments {
-                            self.idents.push(&segment.ident);
+                            self.idents.insert(&segment.ident);
                         }
                     }
                 }
@@ -89,21 +89,21 @@ impl<'a> FieldElements<'a> {
                     match bound {
                         syn::TypeParamBound::Trait(trait_bound) => {
                             if let Some(ident) = trait_bound.path.get_ident() {
-                                self.idents.push(ident);
+                                self.idents.insert(ident);
                             }
                             for segment in &trait_bound.path.segments {
-                                self.idents.push(&segment.ident);
+                                self.idents.insert(&segment.ident);
                                 if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
                                 {
                                     for arg in &args.args {
                                         match arg {
                                             syn::GenericArgument::Type(ty) => self = self.list(ty),
                                             syn::GenericArgument::Lifetime(lt) => {
-                                                self.lifetimes.push(lt)
+                                                self.lifetimes.insert(lt);
                                             }
                                             syn::GenericArgument::Const(Expr::Path(expr_path)) => {
                                                 if let Some(ident) = expr_path.path.get_ident() {
-                                                    self.const_params.push(ident);
+                                                    self.const_params.insert(ident);
                                                 }
                                             }
                                             _ => {}
@@ -112,7 +112,9 @@ impl<'a> FieldElements<'a> {
                                 }
                             }
                         }
-                        syn::TypeParamBound::Lifetime(lt) => self.lifetimes.push(lt),
+                        syn::TypeParamBound::Lifetime(lt) => {
+                            self.lifetimes.insert(lt);
+                        }
                         syn::TypeParamBound::Verbatim(_) => {}
                         _ => {}
                     }
@@ -122,7 +124,7 @@ impl<'a> FieldElements<'a> {
             Type::Infer(_) => self,
             Type::Macro(type_macro) => {
                 if let Some(ident) = type_macro.mac.path.get_ident() {
-                    self.idents.push(ident);
+                    self.idents.insert(ident);
                 }
                 self
             }
@@ -131,16 +133,18 @@ impl<'a> FieldElements<'a> {
 
             Type::Path(type_path) => {
                 for segment in &type_path.path.segments {
-                    self.idents.push(&segment.ident);
+                    self.idents.insert(&segment.ident);
                     match &segment.arguments {
                         PathArguments::AngleBracketed(args) => {
                             for arg in &args.args {
                                 match arg {
                                     GenericArgument::Type(ty) => self = self.list(ty),
-                                    GenericArgument::Lifetime(lt) => self.lifetimes.push(lt),
+                                    GenericArgument::Lifetime(lt) => {
+                                        self.lifetimes.insert(lt);
+                                    }
                                     GenericArgument::Const(Expr::Path(expr_path)) => {
                                         if let Some(ident) = expr_path.path.get_ident() {
-                                            self.const_params.push(ident);
+                                            self.const_params.insert(ident);
                                         }
                                     }
                                     _ => {}
@@ -163,7 +167,7 @@ impl<'a> FieldElements<'a> {
             Type::Ptr(type_ptr) => self.list(&type_ptr.elem),
             Type::Reference(type_reference) => {
                 if let Some(lt) = &type_reference.lifetime {
-                    self.lifetimes.push(lt);
+                    self.lifetimes.insert(lt);
                 }
                 self.list(&type_reference.elem)
             }
@@ -173,21 +177,21 @@ impl<'a> FieldElements<'a> {
                     match bound {
                         syn::TypeParamBound::Trait(trait_bound) => {
                             if let Some(ident) = trait_bound.path.get_ident() {
-                                self.idents.push(ident);
+                                self.idents.insert(ident);
                             }
                             for segment in &trait_bound.path.segments {
-                                self.idents.push(&segment.ident);
+                                self.idents.insert(&segment.ident);
                                 if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
                                 {
                                     for arg in &args.args {
                                         match arg {
                                             syn::GenericArgument::Type(ty) => self = self.list(ty),
                                             syn::GenericArgument::Lifetime(lt) => {
-                                                self.lifetimes.push(lt)
+                                                self.lifetimes.insert(lt);
                                             }
                                             syn::GenericArgument::Const(Expr::Path(expr_path)) => {
                                                 if let Some(ident) = expr_path.path.get_ident() {
-                                                    self.const_params.push(ident);
+                                                    self.const_params.insert(ident);
                                                 }
                                             }
                                             _ => {}
@@ -196,7 +200,9 @@ impl<'a> FieldElements<'a> {
                                 }
                             }
                         }
-                        syn::TypeParamBound::Lifetime(lt) => self.lifetimes.push(lt),
+                        syn::TypeParamBound::Lifetime(lt) => {
+                            self.lifetimes.insert(lt);
+                        }
                         syn::TypeParamBound::Verbatim(_) => {}
                         _ => {}
                     }
