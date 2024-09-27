@@ -13,7 +13,7 @@
 
 use quote::ToTokens;
 use syn::{
-    Attribute, ConstParam, GenericParam, Ident, LifetimeParam, TypeParam, Visibility,
+    Attribute, ConstParam, Field, GenericParam, Ident, LifetimeParam, TypeParam, Visibility,
     WherePredicate,
 };
 
@@ -25,36 +25,37 @@ pub enum StructElement {
     Attribute(Attribute),
     Generic(GenericParam),
     WherePredicate(WherePredicate),
+    Field(Field),
 }
 
 impl std::fmt::Debug for StructElement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Visibility(visibility) => {
+        let string = match self {
+            Self::Visibility(el) => {
                 write!(f, "Visibility(")?;
-                write!(f, "{}", syn_element_to_string(visibility))?;
-                write!(f, ")")
+                syn_element_to_string(el)
             }
-            Self::Ident(ident) => {
+            Self::Ident(el) => {
                 write!(f, "Ident(")?;
-                write!(f, "{}", syn_element_to_string(ident))?;
-                write!(f, ")")
+                syn_element_to_string(el)
             }
-            Self::Attribute(attr) => {
+            Self::Attribute(el) => {
                 write!(f, "Attribute(")?;
-                write!(f, "{}", syn_element_to_string(attr))?;
-                write!(f, ")")
+                syn_element_to_string(el)
             }
-            Self::Generic(attr) => {
+            Self::Generic(el) => {
                 write!(f, "Generic(")?;
-                write!(f, "{}", syn_element_to_string(attr))?;
-                write!(f, ")")
+                syn_element_to_string(el)
             }
-            Self::WherePredicate(attr) => {
+            Self::WherePredicate(el) => {
                 write!(f, "WherePredicate(")?;
-                write!(f, "{}", syn_element_to_string(attr))?;
-                write!(f, ")")
+                syn_element_to_string(el)
             }
-        }
+            Self::Field(el) => {
+                write!(f, "Field(")?;
+                syn_element_to_string(el)
+            }
+        };
+        write!(f, "{})", string)
     }
 }

@@ -16,4 +16,5 @@ pub enum StructRelation {
     AttributeTrain,
     GenericTrain,
     WherePredicateTrain,
+    FieldTrain,
 }

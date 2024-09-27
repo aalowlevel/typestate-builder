@@ -74,7 +74,9 @@ pub fn init(input: DeriveInput) {
     }
 
     match data_struct.fields {
-        Fields::Named(fields_named) => {}
+        Fields::Named(fields_named) => {
+            add_from_syn_list!(graph, map, fields_named.named, Field, FieldTrain);
+        }
         Fields::Unnamed(fields_unnamed) => todo!(),
         Fields::Unit => todo!(),
     }
