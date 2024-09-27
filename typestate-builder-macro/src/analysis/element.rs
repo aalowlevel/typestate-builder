@@ -1,5 +1,7 @@
 use quote::ToTokens;
-use syn::{Attribute, ConstParam, Ident, LifetimeParam, TypeParam, Visibility};
+use syn::{Attribute, ConstParam, Ident, LifetimeParam, TypeParam, Visibility, WherePredicate};
+
+use crate::analysis::syn_element_to_string;
 
 pub enum StructElement<'a> {
     Attrs(Vec<Attribute>),
@@ -8,6 +10,7 @@ pub enum StructElement<'a> {
     GenLifetimes(Vec<&'a LifetimeParam>),
     GenConsts(Vec<&'a ConstParam>),
     GenTypes(Vec<&'a TypeParam>),
+    GenWherePreds(Vec<&'a WherePredicate>),
 }
 
 impl<'a> std::fmt::Debug for StructElement<'a> {
@@ -63,13 +66,16 @@ impl<'a> std::fmt::Debug for StructElement<'a> {
                 }
                 write!(f, ")")
             }
+            Self::GenWherePreds(where_predicates) => {
+                write!(f, "GenWherePreds(")?;
+                for (i, predicate) in where_predicates.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", syn_element_to_string(predicate))?;
+                }
+                write!(f, ")")
+            }
         }
     }
-}
-
-fn syn_element_to_string<E>(element: &E) -> String
-where
-    E: ToTokens,
-{
-    element.to_token_stream().to_string()
 }

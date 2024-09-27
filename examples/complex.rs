@@ -2,8 +2,10 @@
 
 use typestate_builder::TypestateBuilder;
 
+pub(crate) trait MyTrait {}
+
 #[derive(TypestateBuilder)]
-pub struct MultiBoundGeneric<'a, T, const L: usize, U>
+pub(crate) struct MultiBoundGeneric<'a, T, const L: usize, U, V: MyTrait>
 where
     T: Clone + Default + std::fmt::Debug,
     U: Into<String> + Copy,
@@ -13,6 +15,7 @@ where
     data: Vec<T>,
     borrowed: &'a str,
     consted: [u32; L],
+    my_trait: V,
 }
 
 fn main() {}

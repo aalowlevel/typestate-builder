@@ -23,7 +23,7 @@ pub fn init(input: DeriveInput) {
 
     let mut graph = Graph::<StructElement, StructRelation>::new();
 
-    // Basic
+    // Beginning
     graph.add_node(StructElement::Attrs(input.attrs));
     graph.add_node(StructElement::Vis(input.vis));
     graph.add_node(StructElement::Ident(input.ident));
@@ -41,6 +41,13 @@ pub fn init(input: DeriveInput) {
     ));
     graph.add_edge(n_consts, n_types, StructRelation::GenLeftToRight);
 
+    // Generics -> where
+    if let Some(where_clause) = &input.generics.where_clause {
+        graph.add_node(StructElement::GenWherePreds(
+            where_clause.predicates.iter().collect::<Vec<_>>(),
+        ));
+    }
+
     write_graph_to_file(&graph, "example.dot");
 }
 
@@ -52,4 +59,11 @@ fn write_graph_to_file(
     let mut file = File::create(filename)?;
     file.write_all(dot.as_bytes())?;
     Ok(())
+}
+
+fn syn_element_to_string<E>(element: &E) -> String
+where
+    E: ToTokens,
+{
+    element.to_token_stream().to_string()
 }
