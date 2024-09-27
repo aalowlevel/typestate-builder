@@ -19,7 +19,7 @@ use syn::Type;
 
 use crate::{
     graph::{StructElement, StructRelation},
-    write_graph_to_file,
+    syn_element_to_string, write_graph_to_file,
 };
 
 pub fn run(graph: Graph<StructElement, StructRelation>, map: HashMap<String, NodeIndex>) {
@@ -41,7 +41,10 @@ fn bind_field_generics(
             // list all field types recursively.
             let mut types = Vec::new();
             types = list_types(&field.ty, types);
-            emit_call_site_warning!(format!("{:?}", types))
+            emit_call_site_warning!(format!("{:?}", types));
+            for ty in types {
+                emit_call_site_warning!(syn_element_to_string(ty));
+            }
         }
     }
     graph

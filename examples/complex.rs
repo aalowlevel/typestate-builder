@@ -5,10 +5,11 @@ use typestate_builder::TypestateBuilder;
 pub(crate) trait MyTrait {}
 
 #[derive(TypestateBuilder)]
-pub(crate) struct MultiBoundGeneric<'a, T, const L: usize, U, V: MyTrait>
+pub(crate) struct MultiBoundGeneric<'a, T, const L: usize, U, V>
 where
     T: Clone + Default + std::fmt::Debug,
     U: Into<String> + Copy,
+    V: MyTrait,
 {
     item1: T,
     item2: U,
