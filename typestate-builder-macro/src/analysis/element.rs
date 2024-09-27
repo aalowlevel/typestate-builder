@@ -10,7 +10,7 @@ pub enum StructElement<'a> {
     GenLifetimes(Vec<&'a LifetimeParam>),
     GenConsts(Vec<&'a ConstParam>),
     GenTypes(Vec<&'a TypeParam>),
-    GenWherePreds(Vec<&'a WherePredicate>),
+    GenWherePred(&'a WherePredicate),
 }
 
 impl<'a> std::fmt::Debug for StructElement<'a> {
@@ -66,14 +66,9 @@ impl<'a> std::fmt::Debug for StructElement<'a> {
                 }
                 write!(f, ")")
             }
-            Self::GenWherePreds(where_predicates) => {
-                write!(f, "GenWherePreds(")?;
-                for (i, predicate) in where_predicates.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{}", syn_element_to_string(predicate))?;
-                }
+            Self::GenWherePred(where_predicate) => {
+                write!(f, "GenWherePred(")?;
+                write!(f, "{}", syn_element_to_string(where_predicate))?;
                 write!(f, ")")
             }
         }

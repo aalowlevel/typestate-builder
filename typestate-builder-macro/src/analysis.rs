@@ -24,28 +24,41 @@ pub fn init(input: DeriveInput) {
     let mut graph = Graph::<StructElement, StructRelation>::new();
 
     // Beginning
-    graph.add_node(StructElement::Attrs(input.attrs));
-    graph.add_node(StructElement::Vis(input.vis));
-    graph.add_node(StructElement::Ident(input.ident));
+    {
+        graph.add_node(StructElement::Attrs(input.attrs));
+        graph.add_node(StructElement::Vis(input.vis));
+        graph.add_node(StructElement::Ident(input.ident));
+    }
 
     // Generics
-    let n_lifetimes = graph.add_node(StructElement::GenLifetimes(
-        input.generics.lifetimes().collect(),
-    ));
-    let n_consts = graph.add_node(StructElement::GenConsts(
-        input.generics.const_params().collect(),
-    ));
-    graph.add_edge(n_lifetimes, n_consts, StructRelation::GenLeftToRight);
-    let n_types = graph.add_node(StructElement::GenTypes(
-        input.generics.type_params().collect(),
-    ));
-    graph.add_edge(n_consts, n_types, StructRelation::GenLeftToRight);
+    {
+        let n_lifetimes = graph.add_node(StructElement::GenLifetimes(
+            input.generics.lifetimes().collect(),
+        ));
+        let n_consts = graph.add_node(StructElement::GenConsts(
+            input.generics.const_params().collect(),
+        ));
+        graph.add_edge(n_lifetimes, n_consts, StructRelation::GenLeftToRight);
+        let n_types = graph.add_node(StructElement::GenTypes(
+            input.generics.type_params().collect(),
+        ));
+        graph.add_edge(n_consts, n_types, StructRelation::GenLeftToRight);
+    }
 
     // Generics -> where
-    if let Some(where_clause) = &input.generics.where_clause {
-        graph.add_node(StructElement::GenWherePreds(
-            where_clause.predicates.iter().collect::<Vec<_>>(),
-        ));
+    {
+        if let Some(where_clause) = &input.generics.where_clause {
+            let mut before = None;
+            for predicate in where_clause.predicates.iter() {
+                let now = graph.add_node(StructElement::GenWherePred(predicate));
+                if let Some(before) = before.take() {
+                    graph.add_edge(before, now, StructRelation::GenWherePredTopToBottom);
+                }
+                if before.is_none() {
+                    before = Some(now);
+                }
+            }
+        }
     }
 
     write_graph_to_file(&graph, "example.dot");
