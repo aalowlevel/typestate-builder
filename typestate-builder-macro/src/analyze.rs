@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 use proc_macro_error::emit_call_site_warning;
-use syn::Type;
+use syn::{Ident, Type};
 
 use crate::{
     graph::{StructElement, StructRelation},
@@ -39,88 +39,101 @@ fn bind_field_generics(
             };
 
             // list all field types recursively.
-            let mut types = Vec::new();
-            types = list_types(&field.ty, types);
-            emit_call_site_warning!(format!("{:?}", types));
-            for ty in types {
+            let mut idents = Vec::new();
+            idents = list_idents(&field.ty, idents);
+            emit_call_site_warning!(format!("{:?}", idents));
+            for ty in idents {
                 emit_call_site_warning!(syn_element_to_string(ty));
             }
         }
     }
     graph
 }
-fn list_types<'a>(ty: &'a Type, mut types: Vec<&'a Type>) -> Vec<&'a Type> {
-    types.push(ty);
+
+fn list_idents<'a>(ty: &'a Type, mut idents: Vec<&'a Ident>) -> Vec<&'a Ident> {
     match ty {
-        syn::Type::Array(type_array) => list_types(&type_array.elem, types),
+        syn::Type::Array(type_array) => list_idents(&type_array.elem, idents),
         syn::Type::BareFn(type_bare_fn) => {
             for input in &type_bare_fn.inputs {
-                types = list_types(&input.ty, types);
+                idents = list_idents(&input.ty, idents);
             }
             if let syn::ReturnType::Type(_, return_type) = &type_bare_fn.output {
-                types = list_types(return_type, types);
+                idents = list_idents(return_type, idents);
             }
-            types
+            idents
         }
-        syn::Type::Group(type_group) => list_types(&type_group.elem, types),
+        syn::Type::Group(type_group) => list_idents(&type_group.elem, idents),
         syn::Type::ImplTrait(type_impl_trait) => {
             for bound in &type_impl_trait.bounds {
                 if let syn::TypeParamBound::Trait(trait_bound) = bound {
-                    if let Some(last_segment) = trait_bound.path.segments.last() {
-                        if let syn::PathArguments::AngleBracketed(args) = &last_segment.arguments {
+                    idents.extend(trait_bound.path.get_ident());
+                    for segment in &trait_bound.path.segments {
+                        idents.push(&segment.ident);
+                        if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
                             for arg in &args.args {
                                 if let syn::GenericArgument::Type(ty) = arg {
-                                    types = list_types(ty, types);
+                                    idents = list_idents(ty, idents);
                                 }
                             }
                         }
                     }
                 }
             }
-            types
+            idents
         }
-        syn::Type::Infer(_) => types,
-        syn::Type::Macro(_) => types,
-        syn::Type::Never(_) => types,
-        syn::Type::Paren(type_paren) => list_types(&type_paren.elem, types),
+        syn::Type::Infer(_) => idents,
+        syn::Type::Macro(type_macro) => {
+            if let Some(ident) = type_macro.mac.path.get_ident() {
+                idents.push(ident);
+            }
+            idents
+        }
+        syn::Type::Never(_) => idents,
+        syn::Type::Paren(type_paren) => list_idents(&type_paren.elem, idents),
         syn::Type::Path(type_path) => {
-            if let Some(last_segment) = type_path.path.segments.last() {
-                if let syn::PathArguments::AngleBracketed(args) = &last_segment.arguments {
+            if let Some(ident) = type_path.path.get_ident() {
+                idents.push(ident);
+            }
+            for segment in &type_path.path.segments {
+                idents.push(&segment.ident);
+                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
                     for arg in &args.args {
                         if let syn::GenericArgument::Type(ty) = arg {
-                            types = list_types(ty, types);
+                            idents = list_idents(ty, idents);
                         }
                     }
                 }
             }
-            types
+            idents
         }
-        syn::Type::Ptr(type_ptr) => list_types(&type_ptr.elem, types),
-        syn::Type::Reference(type_reference) => list_types(&type_reference.elem, types),
-        syn::Type::Slice(type_slice) => list_types(&type_slice.elem, types),
+        syn::Type::Ptr(type_ptr) => list_idents(&type_ptr.elem, idents),
+        syn::Type::Reference(type_reference) => list_idents(&type_reference.elem, idents),
+        syn::Type::Slice(type_slice) => list_idents(&type_slice.elem, idents),
         syn::Type::TraitObject(type_trait_object) => {
             for bound in &type_trait_object.bounds {
                 if let syn::TypeParamBound::Trait(trait_bound) = bound {
-                    if let Some(last_segment) = trait_bound.path.segments.last() {
-                        if let syn::PathArguments::AngleBracketed(args) = &last_segment.arguments {
+                    idents.extend(trait_bound.path.get_ident());
+                    for segment in &trait_bound.path.segments {
+                        idents.push(&segment.ident);
+                        if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
                             for arg in &args.args {
                                 if let syn::GenericArgument::Type(ty) = arg {
-                                    types = list_types(ty, types);
+                                    idents = list_idents(ty, idents);
                                 }
                             }
                         }
                     }
                 }
             }
-            types
+            idents
         }
         syn::Type::Tuple(type_tuple) => {
             for elem in &type_tuple.elems {
-                types = list_types(elem, types);
+                idents = list_idents(elem, idents);
             }
-            types
+            idents
         }
-        syn::Type::Verbatim(_) => types,
-        _ => types,
+        syn::Type::Verbatim(_) => idents,
+        _ => idents,
     }
 }
