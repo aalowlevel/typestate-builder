@@ -11,14 +11,14 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
+use fixedbitset::FixedBitSet;
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
-use proc_macro_error::emit_call_site_warning;
-use syn::{Expr, GenericArgument, Ident, Lifetime, PathArguments, Type};
+use syn::GenericParam;
 
 use crate::{
-    graph::{StructElement, StructRelation},
+    graph::{Field, StructElement, StructRelation},
     write_graph_to_file,
 };
 
@@ -31,28 +31,19 @@ fn bind_field_elements(
     mut graph: Graph<StructElement, StructRelation>,
     map: &HashMap<String, NodeIndex>,
 ) -> Graph<StructElement, StructRelation> {
-    let dfs_fields = map.get("Field0").map(|f| Dfs::new(&graph, *f));
-    if let Some(mut dfs_fields) = dfs_fields {
+    if let Some(mut dfs_fields) = get_start_node(&graph, map, "Field0") {
+        // Traverse on field train.
         while let Some(ix_field) = dfs_fields.next(&graph) {
-            let Some(StructElement::Field(field)) = graph.node_weight_mut(ix_field) else {
-                panic!("Only Field is accepted.");
-            };
+            let field = get_node_as_field(&mut graph, ix_field);
 
             // List some field assets recursively.
             field.list();
-            emit_call_site_warning!(format!(
-                "{:#?}{:#?}{:#?}",
-                field.idents, field.lifetimes, field.const_params
-            ));
 
             // Search for field assets in the main generics and match.
-            let dfs_generics = map.get("Generic0").map(|f| Dfs::new(&graph, *f));
-            if let Some(mut dfs_generics) = dfs_generics {
+            if let Some(mut dfs_generics) = get_start_node(&graph, map, "Generic0") {
+                // Traverse on generic train.
                 while let Some(ix_generic) = dfs_generics.next(&graph) {
-                    let Some(StructElement::Generic(generic)) = graph.node_weight_mut(ix_generic)
-                    else {
-                        panic!("Only Generic is accepted.")
-                    };
+                    let generic = get_node_as_generic(&mut graph, ix_generic);
                 }
             }
 
@@ -60,4 +51,32 @@ fn bind_field_elements(
         }
     }
     graph
+}
+
+fn get_start_node(
+    graph: &Graph<StructElement, StructRelation>,
+    map: &HashMap<String, NodeIndex>,
+    key: &str,
+) -> Option<Dfs<NodeIndex, FixedBitSet>> {
+    map.get(key).map(|f| Dfs::new(graph, *f))
+}
+
+fn get_node_as_field(
+    graph: &mut Graph<StructElement, StructRelation>,
+    index: NodeIndex,
+) -> &mut Field {
+    match graph.node_weight_mut(index) {
+        Some(StructElement::Field(field)) => field,
+        _ => panic!("Only Field is accepted."),
+    }
+}
+
+fn get_node_as_generic(
+    graph: &mut Graph<StructElement, StructRelation>,
+    index: NodeIndex,
+) -> &mut GenericParam {
+    match graph.node_weight_mut(index) {
+        Some(StructElement::Generic(generic)) => generic,
+        _ => panic!("Only Generic is accepted."),
+    }
 }
