@@ -1,5 +1,6 @@
 #[derive(Debug)]
 pub enum StructRelation {
-    GenLeftToRight,
-    GenWherePredTopToBottom,
+    AttributeTrain,
+    GenericTrain,
+    WherePredicateTrain,
 }

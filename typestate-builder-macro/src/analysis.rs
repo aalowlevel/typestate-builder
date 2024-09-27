@@ -16,6 +16,23 @@ use syn::{
     LifetimeParam, TypeParam, Visibility,
 };
 
+macro_rules! add_from_syn_list {
+    ($graph:expr, $list:expr, $first_node:ident, $node:ident, $edge:ident) => {{
+        let mut predecessor = None;
+        for (i, attr) in $list.into_iter().enumerate() {
+            let successor = if i == 0 {
+                $graph.add_node(StructElement::$first_node(attr))
+            } else {
+                $graph.add_node(StructElement::$node(attr))
+            };
+            if let Some(predecessor) = predecessor.take() {
+                $graph.add_edge(predecessor, successor, StructRelation::$edge);
+            }
+            predecessor.get_or_insert(successor);
+        }
+    }};
+}
+
 pub fn init(input: DeriveInput) {
     let Data::Struct(data_struct) = input.data else {
         panic!("TypestateBuilder only supports structs");
@@ -25,40 +42,32 @@ pub fn init(input: DeriveInput) {
 
     // Beginning
     {
-        graph.add_node(StructElement::Attrs(input.attrs));
-        graph.add_node(StructElement::Vis(input.vis));
+        graph.add_node(StructElement::Visibility(input.vis));
         graph.add_node(StructElement::Ident(input.ident));
     }
 
-    // Generics
-    {
-        let n_lifetimes = graph.add_node(StructElement::GenLifetimes(
-            input.generics.lifetimes().collect(),
-        ));
-        let n_consts = graph.add_node(StructElement::GenConsts(
-            input.generics.const_params().collect(),
-        ));
-        graph.add_edge(n_lifetimes, n_consts, StructRelation::GenLeftToRight);
-        let n_types = graph.add_node(StructElement::GenTypes(
-            input.generics.type_params().collect(),
-        ));
-        graph.add_edge(n_consts, n_types, StructRelation::GenLeftToRight);
-    }
-
-    // Generics -> where
-    {
-        if let Some(where_clause) = &input.generics.where_clause {
-            let mut before = None;
-            for predicate in where_clause.predicates.iter() {
-                let now = graph.add_node(StructElement::GenWherePred(predicate));
-                if let Some(before) = before.take() {
-                    graph.add_edge(before, now, StructRelation::GenWherePredTopToBottom);
-                }
-                if before.is_none() {
-                    before = Some(now);
-                }
-            }
-        }
+    add_from_syn_list!(
+        graph,
+        input.attrs,
+        AttributeFirst,
+        Attribute,
+        AttributeTrain
+    );
+    add_from_syn_list!(
+        graph,
+        input.generics.params,
+        GenericFirst,
+        Generic,
+        GenericTrain
+    );
+    if let Some(where_clause) = input.generics.where_clause {
+        add_from_syn_list!(
+            graph,
+            where_clause.predicates,
+            WherePredicateFirst,
+            WherePredicate,
+            WherePredicateTrain
+        );
     }
 
     write_graph_to_file(&graph, "example.dot");
