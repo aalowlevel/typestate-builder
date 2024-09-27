@@ -39,12 +39,8 @@ fn bind_field_generics(
             };
 
             // list some field assets recursively.
-            let idents = Vec::new();
-            let lifetimes = Vec::new();
-            let const_params = Vec::new();
-            let (idents, lifetimes, const_params) =
-                list_idents(&field.ty, idents, lifetimes, const_params);
-            emit_call_site_warning!(format!("{:#?}{:#?}{:#?}", idents, lifetimes, const_params));
+            let field_elements = FieldElements::default().list(&field.ty);
+            emit_call_site_warning!(format!("{:#?}", field_elements));
             // for ty in idents {
             //     emit_call_site_warning!(syn_element_to_string(ty));
             // }
@@ -53,193 +49,146 @@ fn bind_field_generics(
     graph
 }
 
-fn list_idents<'a>(
-    ty: &'a Type,
-    mut idents: Vec<&'a Ident>,
-    mut lifetimes: Vec<&'a Lifetime>,
-    mut const_params: Vec<&'a Expr>,
-) -> (Vec<&'a Ident>, Vec<&'a Lifetime>, Vec<&'a Expr>) {
-    match ty {
-        syn::Type::Array(type_array) => {
-            if let syn::Expr::Lit(syn::ExprLit {
-                lit: syn::Lit::Int(_int_lit),
-                ..
-            }) = &type_array.len
-            {
-                const_params.push(&type_array.len);
+#[derive(Debug, Default)]
+struct FieldElements<'a> {
+    idents: Vec<&'a Ident>,
+    lifetimes: Vec<&'a Lifetime>,
+    const_params: Vec<&'a Expr>,
+}
+
+impl<'a> FieldElements<'a> {
+    fn list(mut self, ty: &'a Type) -> Self {
+        match ty {
+            Type::Array(type_array) => {
+                if let Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Int(_),
+                    ..
+                }) = &type_array.len
+                {
+                    self.const_params.push(&type_array.len);
+                }
+                self.list(&type_array.elem)
             }
-            let (new_idents, new_lifetimes, new_const_params) =
-                list_idents(&type_array.elem, idents, lifetimes, const_params);
-            idents = new_idents;
-            lifetimes = new_lifetimes;
-            const_params = new_const_params;
-        }
-        syn::Type::BareFn(type_bare_fn) => {
-            for input in &type_bare_fn.inputs {
-                let (new_idents, new_lifetimes, new_const_params) =
-                    list_idents(&input.ty, idents, lifetimes, const_params);
-                idents = new_idents;
-                lifetimes = new_lifetimes;
-                const_params = new_const_params;
+            Type::BareFn(type_bare_fn) => {
+                for input in &type_bare_fn.inputs {
+                    self = self.list(&input.ty);
+                }
+                if let syn::ReturnType::Type(_, return_type) = &type_bare_fn.output {
+                    self = self.list(return_type);
+                }
+                self
             }
-            if let syn::ReturnType::Type(_, return_type) = &type_bare_fn.output {
-                let (new_idents, new_lifetimes, new_const_params) =
-                    list_idents(return_type, idents, lifetimes, const_params);
-                idents = new_idents;
-                lifetimes = new_lifetimes;
-                const_params = new_const_params;
-            }
-        }
-        syn::Type::Group(type_group) => {
-            let (new_idents, new_lifetimes, new_const_params) =
-                list_idents(&type_group.elem, idents, lifetimes, const_params);
-            idents = new_idents;
-            lifetimes = new_lifetimes;
-            const_params = new_const_params;
-        }
-        syn::Type::ImplTrait(type_impl_trait) => {
-            for bound in &type_impl_trait.bounds {
-                match bound {
-                    syn::TypeParamBound::Trait(trait_bound) => {
-                        idents.extend(trait_bound.path.get_ident());
-                        for segment in &trait_bound.path.segments {
-                            idents.push(&segment.ident);
-                            if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                                for arg in &args.args {
-                                    match arg {
-                                        syn::GenericArgument::Type(ty) => {
-                                            let (new_idents, new_lifetimes, new_const_params) =
-                                                list_idents(ty, idents, lifetimes, const_params);
-                                            idents = new_idents;
-                                            lifetimes = new_lifetimes;
-                                            const_params = new_const_params;
+            Type::Group(type_group) => self.list(&type_group.elem),
+            Type::ImplTrait(type_impl_trait) => {
+                for bound in &type_impl_trait.bounds {
+                    match bound {
+                        syn::TypeParamBound::Trait(trait_bound) => {
+                            if let Some(ident) = trait_bound.path.get_ident() {
+                                self.idents.push(ident);
+                            }
+                            for segment in &trait_bound.path.segments {
+                                self.idents.push(&segment.ident);
+                                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+                                {
+                                    for arg in &args.args {
+                                        match arg {
+                                            syn::GenericArgument::Type(ty) => self = self.list(ty),
+                                            syn::GenericArgument::Lifetime(lt) => {
+                                                self.lifetimes.push(lt)
+                                            }
+                                            syn::GenericArgument::Const(expr) => {
+                                                self.const_params.push(expr)
+                                            }
+                                            _ => {}
                                         }
-                                        syn::GenericArgument::Lifetime(lt) => lifetimes.push(lt),
-                                        syn::GenericArgument::Const(expr) => {
-                                            const_params.push(expr)
-                                        }
-                                        _ => {}
                                     }
                                 }
                             }
                         }
+                        syn::TypeParamBound::Lifetime(lt) => self.lifetimes.push(lt),
+                        syn::TypeParamBound::Verbatim(_) => {}
+                        _ => {}
                     }
-                    syn::TypeParamBound::Lifetime(lt) => lifetimes.push(lt),
-                    syn::TypeParamBound::Verbatim(_token_stream) => {}
-                    _ => {}
                 }
+                self
             }
-        }
-        syn::Type::Infer(_) => {}
-        syn::Type::Macro(type_macro) => {
-            if let Some(ident) = type_macro.mac.path.get_ident() {
-                idents.push(ident);
+            Type::Infer(_) => self,
+            Type::Macro(type_macro) => {
+                if let Some(ident) = type_macro.mac.path.get_ident() {
+                    self.idents.push(ident);
+                }
+                self
             }
-        }
-        syn::Type::Never(_) => {}
-        syn::Type::Paren(type_paren) => {
-            let (new_idents, new_lifetimes, new_const_params) =
-                list_idents(&type_paren.elem, idents, lifetimes, const_params);
-            idents = new_idents;
-            lifetimes = new_lifetimes;
-            const_params = new_const_params;
-        }
-        syn::Type::Path(type_path) => {
-            if let Some(qself) = &type_path.qself {
-                let (new_idents, new_lifetimes, new_const_params) =
-                    list_idents(&qself.ty, idents, lifetimes, const_params);
-                idents = new_idents;
-                lifetimes = new_lifetimes;
-                const_params = new_const_params;
-            }
-            for segment in &type_path.path.segments {
-                idents.push(&segment.ident);
-                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                    for arg in &args.args {
-                        match arg {
-                            syn::GenericArgument::Type(ty) => {
-                                let (new_idents, new_lifetimes, new_const_params) =
-                                    list_idents(ty, idents, lifetimes, const_params);
-                                idents = new_idents;
-                                lifetimes = new_lifetimes;
-                                const_params = new_const_params;
+            Type::Never(_) => self,
+            Type::Paren(type_paren) => self.list(&type_paren.elem),
+            Type::Path(type_path) => {
+                if let Some(qself) = &type_path.qself {
+                    self = self.list(&qself.ty);
+                }
+                for segment in &type_path.path.segments {
+                    self.idents.push(&segment.ident);
+                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                        for arg in &args.args {
+                            match arg {
+                                syn::GenericArgument::Type(ty) => self = self.list(ty),
+                                syn::GenericArgument::Lifetime(lt) => self.lifetimes.push(lt),
+                                syn::GenericArgument::Const(expr) => self.const_params.push(expr),
+                                _ => {}
                             }
-                            syn::GenericArgument::Lifetime(lt) => lifetimes.push(lt),
-                            syn::GenericArgument::Const(expr) => const_params.push(expr),
-                            _ => {}
                         }
                     }
                 }
+                self
             }
-        }
-        syn::Type::Ptr(type_ptr) => {
-            let (new_idents, new_lifetimes, new_const_params) =
-                list_idents(&type_ptr.elem, idents, lifetimes, const_params);
-            idents = new_idents;
-            lifetimes = new_lifetimes;
-            const_params = new_const_params;
-        }
-        syn::Type::Reference(type_reference) => {
-            if let Some(lt) = &type_reference.lifetime {
-                lifetimes.push(lt);
+            Type::Ptr(type_ptr) => self.list(&type_ptr.elem),
+            Type::Reference(type_reference) => {
+                if let Some(lt) = &type_reference.lifetime {
+                    self.lifetimes.push(lt);
+                }
+                self.list(&type_reference.elem)
             }
-            let (new_idents, new_lifetimes, new_const_params) =
-                list_idents(&type_reference.elem, idents, lifetimes, const_params);
-            idents = new_idents;
-            lifetimes = new_lifetimes;
-            const_params = new_const_params;
-        }
-        syn::Type::Slice(type_slice) => {
-            let (new_idents, new_lifetimes, new_const_params) =
-                list_idents(&type_slice.elem, idents, lifetimes, const_params);
-            idents = new_idents;
-            lifetimes = new_lifetimes;
-            const_params = new_const_params;
-        }
-        syn::Type::TraitObject(type_trait_object) => {
-            for bound in &type_trait_object.bounds {
-                match bound {
-                    syn::TypeParamBound::Trait(trait_bound) => {
-                        idents.extend(trait_bound.path.get_ident());
-                        for segment in &trait_bound.path.segments {
-                            idents.push(&segment.ident);
-                            if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                                for arg in &args.args {
-                                    match arg {
-                                        syn::GenericArgument::Type(ty) => {
-                                            let (new_idents, new_lifetimes, new_const_params) =
-                                                list_idents(ty, idents, lifetimes, const_params);
-                                            idents = new_idents;
-                                            lifetimes = new_lifetimes;
-                                            const_params = new_const_params;
+            Type::Slice(type_slice) => self.list(&type_slice.elem),
+            Type::TraitObject(type_trait_object) => {
+                for bound in &type_trait_object.bounds {
+                    match bound {
+                        syn::TypeParamBound::Trait(trait_bound) => {
+                            if let Some(ident) = trait_bound.path.get_ident() {
+                                self.idents.push(ident);
+                            }
+                            for segment in &trait_bound.path.segments {
+                                self.idents.push(&segment.ident);
+                                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+                                {
+                                    for arg in &args.args {
+                                        match arg {
+                                            syn::GenericArgument::Type(ty) => self = self.list(ty),
+                                            syn::GenericArgument::Lifetime(lt) => {
+                                                self.lifetimes.push(lt)
+                                            }
+                                            syn::GenericArgument::Const(expr) => {
+                                                self.const_params.push(expr)
+                                            }
+                                            _ => {}
                                         }
-                                        syn::GenericArgument::Lifetime(lt) => lifetimes.push(lt),
-                                        syn::GenericArgument::Const(expr) => {
-                                            const_params.push(expr)
-                                        }
-                                        _ => {}
                                     }
                                 }
                             }
                         }
+                        syn::TypeParamBound::Lifetime(lt) => self.lifetimes.push(lt),
+                        syn::TypeParamBound::Verbatim(_) => {}
+                        _ => {}
                     }
-                    syn::TypeParamBound::Lifetime(lt) => lifetimes.push(lt),
-                    syn::TypeParamBound::Verbatim(_token_stream) => {}
-                    _ => {}
                 }
+                self
             }
-        }
-        syn::Type::Tuple(type_tuple) => {
-            for elem in &type_tuple.elems {
-                let (new_idents, new_lifetimes, new_const_params) =
-                    list_idents(elem, idents, lifetimes, const_params);
-                idents = new_idents;
-                lifetimes = new_lifetimes;
-                const_params = new_const_params;
+            Type::Tuple(type_tuple) => {
+                for elem in &type_tuple.elems {
+                    self = self.list(elem);
+                }
+                self
             }
+            Type::Verbatim(_) => self,
+            _ => self,
         }
-        syn::Type::Verbatim(_) => {}
-        _ => {}
     }
-    (idents, lifetimes, const_params)
 }
