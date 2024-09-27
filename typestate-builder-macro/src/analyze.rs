@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 use proc_macro_error::emit_call_site_warning;
-use syn::{Expr, Ident, Lifetime, Type};
+use syn::{Expr, GenericArgument, Ident, Lifetime, PathArguments, Type};
 
 use crate::{
     graph::{StructElement, StructRelation},
@@ -53,21 +53,26 @@ fn bind_field_generics(
 struct FieldElements<'a> {
     idents: Vec<&'a Ident>,
     lifetimes: Vec<&'a Lifetime>,
-    const_params: Vec<&'a Expr>,
+    const_params: Vec<&'a Ident>,
 }
 
 impl<'a> FieldElements<'a> {
     fn list(mut self, ty: &'a Type) -> Self {
         match ty {
             Type::Array(type_array) => {
-                if let Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Int(_),
-                    ..
-                }) = &type_array.len
-                {
-                    self.const_params.push(&type_array.len);
+                self = self.list(&type_array.elem);
+                // Handle const generic in array length
+                if let Expr::Path(expr_path) = &type_array.len {
+                    if let Some(ident) = expr_path.path.get_ident() {
+                        self.const_params.push(ident);
+                    } else {
+                        // Handle multi-segment paths
+                        for segment in &expr_path.path.segments {
+                            self.idents.push(&segment.ident);
+                        }
+                    }
                 }
-                self.list(&type_array.elem)
+                self
             }
             Type::BareFn(type_bare_fn) => {
                 for input in &type_bare_fn.inputs {
@@ -96,8 +101,10 @@ impl<'a> FieldElements<'a> {
                                             syn::GenericArgument::Lifetime(lt) => {
                                                 self.lifetimes.push(lt)
                                             }
-                                            syn::GenericArgument::Const(expr) => {
-                                                self.const_params.push(expr)
+                                            syn::GenericArgument::Const(Expr::Path(expr_path)) => {
+                                                if let Some(ident) = expr_path.path.get_ident() {
+                                                    self.const_params.push(ident);
+                                                }
                                             }
                                             _ => {}
                                         }
@@ -121,21 +128,34 @@ impl<'a> FieldElements<'a> {
             }
             Type::Never(_) => self,
             Type::Paren(type_paren) => self.list(&type_paren.elem),
+
             Type::Path(type_path) => {
-                if let Some(qself) = &type_path.qself {
-                    self = self.list(&qself.ty);
-                }
                 for segment in &type_path.path.segments {
                     self.idents.push(&segment.ident);
-                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                        for arg in &args.args {
-                            match arg {
-                                syn::GenericArgument::Type(ty) => self = self.list(ty),
-                                syn::GenericArgument::Lifetime(lt) => self.lifetimes.push(lt),
-                                syn::GenericArgument::Const(expr) => self.const_params.push(expr),
-                                _ => {}
+                    match &segment.arguments {
+                        PathArguments::AngleBracketed(args) => {
+                            for arg in &args.args {
+                                match arg {
+                                    GenericArgument::Type(ty) => self = self.list(ty),
+                                    GenericArgument::Lifetime(lt) => self.lifetimes.push(lt),
+                                    GenericArgument::Const(Expr::Path(expr_path)) => {
+                                        if let Some(ident) = expr_path.path.get_ident() {
+                                            self.const_params.push(ident);
+                                        }
+                                    }
+                                    _ => {}
+                                }
                             }
                         }
+                        PathArguments::Parenthesized(args) => {
+                            for ty in &args.inputs {
+                                self = self.list(ty);
+                            }
+                            if let syn::ReturnType::Type(_, ty) = &args.output {
+                                self = self.list(ty);
+                            }
+                        }
+                        PathArguments::None => {}
                     }
                 }
                 self
@@ -165,8 +185,10 @@ impl<'a> FieldElements<'a> {
                                             syn::GenericArgument::Lifetime(lt) => {
                                                 self.lifetimes.push(lt)
                                             }
-                                            syn::GenericArgument::Const(expr) => {
-                                                self.const_params.push(expr)
+                                            syn::GenericArgument::Const(Expr::Path(expr_path)) => {
+                                                if let Some(ident) = expr_path.path.get_ident() {
+                                                    self.const_params.push(ident);
+                                                }
                                             }
                                             _ => {}
                                         }
