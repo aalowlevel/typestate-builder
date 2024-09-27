@@ -11,8 +11,8 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use serde::Serialize;
-use syn::{Attribute, Field, GenericParam, Ident, Visibility, WherePredicate};
+use serde::{ser::SerializeStruct, Serialize};
+use syn::{Attribute, GenericParam, Ident, Visibility, WherePredicate};
 use syn_serde::Syn;
 
 pub enum StructElement {
@@ -64,7 +64,7 @@ impl Serialize for StructElement {
                 "StructElement",
                 0,
                 "Field",
-                &field.to_adapter(),
+                &field.syn.to_adapter(),
             ),
         }
     }
@@ -87,4 +87,19 @@ pub enum StructRelation {
     WherePredicateTrain,
     FieldTrain,
     FieldGenerics,
+}
+
+pub struct Field {
+    pub syn: syn::Field,
+}
+
+impl Serialize for Field {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut res = serializer.serialize_struct("Field", 1)?;
+        res.serialize_field("syn", &self.syn.to_adapter())?;
+        res.end()
+    }
 }

@@ -11,7 +11,7 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use crate::{StructElement, StructRelation};
+use crate::{graph::Field, StructElement, StructRelation};
 
 use std::collections::HashMap;
 
@@ -69,10 +69,20 @@ pub fn run(
 
     match data_struct.fields {
         Fields::Named(fields_named) => {
-            add_from_syn_list!(graph, map, fields_named.named, Field, FieldTrain);
+            let fields = fields_named
+                .named
+                .into_iter()
+                .map(|f| Field { syn: f })
+                .collect::<Vec<_>>();
+            add_from_syn_list!(graph, map, fields, Field, FieldTrain);
         }
         Fields::Unnamed(fields_unnamed) => {
-            add_from_syn_list!(graph, map, fields_unnamed.unnamed, Field, FieldTrain);
+            let fields = fields_unnamed
+                .unnamed
+                .into_iter()
+                .map(|f| Field { syn: f })
+                .collect::<Vec<_>>();
+            add_from_syn_list!(graph, map, fields, Field, FieldTrain);
         }
         Fields::Unit => {}
     }
