@@ -41,11 +41,14 @@
 #![allow(unused)]
 
 mod analyze;
+mod graph;
 mod parse;
 mod produce;
 
-use std::collections::HashSet;
+use std::{collections::HashSet, fs::File, io::Write};
 
+use graph::{StructElement, StructRelation};
+use petgraph::{dot::Dot, Graph};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro_error::proc_macro_error;
@@ -68,27 +71,8 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     // Firstly, we need to parse input data.
-    parse::init(input);
-
-    // Match the type of struct and generate the appropriate builder code.
-    // let TypestateBuilderOutPut {
-    //     state_structs,
-    //     builder_struct,
-    //     builder_method,
-    //     builder_constructor_methods,
-    //     build_method,
-    // } = match &input.data {
-    //     // Handle named field structs.
-    //     Data::Struct(data) => match &data.fields {
-    //         Fields::Named(fields) => generate_named_struct_code(&input, fields),
-    //         // Handle tuple structs (structs with unnamed fields).
-    //         Fields::Unnamed(fields) => generate_tuple_struct_code(&input, fields),
-    //         // Handle unit structs (structs with no fields).
-    //         Fields::Unit => generate_unit_struct_code(&input),
-    //     },
-    //     // Panic if applied to anything other than a struct.
-    //     _ => panic!("TypestateBuilder only supports structs"),
-    // };
+    let (graph, map) = parse::run(input);
+    analyze::run(graph, map);
 
     // // Combine the generated code into a final token stream.
     // let output = quote! {
@@ -102,4 +86,21 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     // // Return the generated code.
     // output.into()
     quote! {}.into()
+}
+
+fn write_graph_to_file(
+    graph: &Graph<StructElement, StructRelation>,
+    filename: &str,
+) -> std::io::Result<()> {
+    let dot = format!("{:?}", Dot::new(graph));
+    let mut file = File::create(filename)?;
+    file.write_all(dot.as_bytes())?;
+    Ok(())
+}
+
+fn syn_element_to_string<E>(element: &E) -> String
+where
+    E: ToTokens,
+{
+    element.to_token_stream().to_string()
 }

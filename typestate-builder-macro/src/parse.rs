@@ -11,19 +11,17 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-pub mod element;
-pub mod relation;
+use crate::{StructElement, StructRelation};
 
 use std::{collections::HashMap, fs::File, io::Write};
 
-use element::StructElement;
 use petgraph::{
     dot::{Config, Dot},
+    graph::NodeIndex,
     Graph,
 };
 use proc_macro_error::emit_call_site_warning;
 use quote::ToTokens;
-use relation::StructRelation;
 use syn::{
     Attribute, ConstParam, Data, DataStruct, DeriveInput, Fields, FieldsNamed, Ident,
     LifetimeParam, TypeParam, Visibility,
@@ -45,7 +43,12 @@ macro_rules! add_from_syn_list {
     }};
 }
 
-pub fn init(input: DeriveInput) {
+pub fn run(
+    input: DeriveInput,
+) -> (
+    Graph<StructElement, StructRelation>,
+    HashMap<String, NodeIndex>,
+) {
     let Data::Struct(data_struct) = input.data else {
         panic!("TypestateBuilder only supports structs");
     };
@@ -83,23 +86,5 @@ pub fn init(input: DeriveInput) {
         Fields::Unit => {}
     }
 
-    emit_call_site_warning!(format!("{:?}", map));
-    write_graph_to_file(&graph, "example.dot");
-}
-
-fn write_graph_to_file(
-    graph: &Graph<StructElement, StructRelation>,
-    filename: &str,
-) -> std::io::Result<()> {
-    let dot = format!("{:?}", Dot::new(graph));
-    let mut file = File::create(filename)?;
-    file.write_all(dot.as_bytes())?;
-    Ok(())
-}
-
-fn syn_element_to_string<E>(element: &E) -> String
-where
-    E: ToTokens,
-{
-    element.to_token_stream().to_string()
+    (graph, map)
 }

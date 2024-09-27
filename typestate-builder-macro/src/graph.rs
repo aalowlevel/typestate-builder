@@ -17,7 +17,7 @@ use syn::{
     WherePredicate,
 };
 
-use crate::parse::syn_element_to_string;
+use crate::syn_element_to_string;
 
 pub enum StructElement {
     Visibility(Visibility),
@@ -58,4 +58,12 @@ impl std::fmt::Debug for StructElement {
         };
         write!(f, "{})", string)
     }
+}
+
+#[derive(Debug)]
+pub enum StructRelation {
+    AttributeTrain,
+    GenericTrain,
+    WherePredicateTrain,
+    FieldTrain,
 }
