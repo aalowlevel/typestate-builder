@@ -11,13 +11,9 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use quote::ToTokens;
-use syn::{
-    Attribute, ConstParam, Field, GenericParam, Ident, LifetimeParam, TypeParam, Visibility,
-    WherePredicate,
-};
-
-use crate::syn_element_to_string;
+use serde::Serialize;
+use syn::{Attribute, Field, GenericParam, Ident, Visibility, WherePredicate};
+use syn_serde::Syn;
 
 pub enum StructElement {
     Visibility(Visibility),
@@ -28,35 +24,59 @@ pub enum StructElement {
     Field(Field),
 }
 
+impl Serialize for StructElement {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            StructElement::Visibility(visibility) => serializer.serialize_newtype_variant(
+                "StructElement",
+                0,
+                "Visibility",
+                &visibility.to_adapter(),
+            ),
+            StructElement::Ident(ident) => serializer.serialize_newtype_variant(
+                "StructElement",
+                0,
+                "Ident",
+                &ident.to_adapter(),
+            ),
+            StructElement::Attribute(attribute) => serializer.serialize_newtype_variant(
+                "StructElement",
+                0,
+                "Attribute",
+                &attribute.to_adapter(),
+            ),
+            StructElement::Generic(generic_param) => serializer.serialize_newtype_variant(
+                "StructElement",
+                0,
+                "GenericParam",
+                &generic_param.to_adapter(),
+            ),
+            StructElement::WherePredicate(where_predicate) => serializer.serialize_newtype_variant(
+                "StructElement",
+                0,
+                "WherePredicate",
+                &where_predicate.to_adapter(),
+            ),
+            StructElement::Field(field) => serializer.serialize_newtype_variant(
+                "StructElement",
+                0,
+                "Field",
+                &field.to_adapter(),
+            ),
+        }
+    }
+}
+
 impl std::fmt::Debug for StructElement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string = match self {
-            Self::Visibility(el) => {
-                write!(f, "Visibility(")?;
-                syn_element_to_string(el)
-            }
-            Self::Ident(el) => {
-                write!(f, "Ident(")?;
-                syn_element_to_string(el)
-            }
-            Self::Attribute(el) => {
-                write!(f, "Attribute(")?;
-                syn_element_to_string(el)
-            }
-            Self::Generic(el) => {
-                write!(f, "Generic(")?;
-                syn_element_to_string(el)
-            }
-            Self::WherePredicate(el) => {
-                write!(f, "WherePredicate(")?;
-                syn_element_to_string(el)
-            }
-            Self::Field(el) => {
-                write!(f, "Field(")?;
-                syn_element_to_string(el)
-            }
-        };
-        write!(f, "{})", string)
+        write!(
+            f,
+            "{}",
+            serde_json::to_string(self).expect("serialize to string pretty")
+        )
     }
 }
 

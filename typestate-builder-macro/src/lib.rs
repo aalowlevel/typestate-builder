@@ -44,18 +44,14 @@ mod graph;
 mod parse;
 mod produce;
 
-use std::{collections::HashSet, fs::File, io::Write};
+use std::{fs::File, io::Write};
 
 use graph::{StructElement, StructRelation};
 use petgraph::{dot::Dot, Graph};
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
 use proc_macro_error::proc_macro_error;
-use quote::{format_ident, quote, ToTokens};
-use syn::{
-    parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, GenericParam,
-    Generics, Ident, Lifetime, Type, WhereClause, WherePredicate,
-};
+use quote::quote;
+use syn::{parse_macro_input, DeriveInput};
 
 /// The `TypestateBuilder` derive macro generates builder pattern code based on the
 /// typestate pattern. It provides compile-time guarantees that all necessary fields
@@ -95,11 +91,4 @@ fn write_graph_to_file(
     let mut file = File::create(filename)?;
     file.write_all(dot.as_bytes())?;
     Ok(())
-}
-
-fn syn_element_to_string<E>(element: &E) -> String
-where
-    E: ToTokens,
-{
-    element.to_token_stream().to_string()
 }

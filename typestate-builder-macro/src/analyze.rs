@@ -23,11 +23,11 @@ use crate::{
 };
 
 pub fn run(graph: Graph<StructElement, StructRelation>, map: HashMap<String, NodeIndex>) {
-    let graph = bind_field_generics(graph, &map);
+    let graph = bind_field_elements(graph, &map);
     write_graph_to_file(&graph, "example.dot").unwrap();
 }
 
-fn bind_field_generics(
+fn bind_field_elements(
     mut graph: Graph<StructElement, StructRelation>,
     map: &HashMap<String, NodeIndex>,
 ) -> Graph<StructElement, StructRelation> {
@@ -44,6 +44,14 @@ fn bind_field_generics(
 
             // Search for field assets in the main generics and match.
             let dfs_generics = map.get("Generic0").map(|f| Dfs::new(&graph, *f));
+            if let Some(mut dfs_generics) = dfs_generics {
+                while let Some(ix_generic) = dfs_generics.next(&graph) {
+                    let Some(StructElement::Generic(generic)) = graph.node_weight_mut(ix_generic)
+                    else {
+                        panic!("Only Generic is accepted.")
+                    };
+                }
+            }
 
             // Search for field assets in where predicates.
         }
