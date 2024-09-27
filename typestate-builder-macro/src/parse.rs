@@ -77,8 +77,10 @@ pub fn init(input: DeriveInput) {
         Fields::Named(fields_named) => {
             add_from_syn_list!(graph, map, fields_named.named, Field, FieldTrain);
         }
-        Fields::Unnamed(fields_unnamed) => todo!(),
-        Fields::Unit => todo!(),
+        Fields::Unnamed(fields_unnamed) => {
+            add_from_syn_list!(graph, map, fields_unnamed.unnamed, Field, FieldTrain);
+        }
+        Fields::Unit => {}
     }
 
     emit_call_site_warning!(format!("{:?}", map));
