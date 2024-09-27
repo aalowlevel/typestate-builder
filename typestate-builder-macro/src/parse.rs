@@ -13,7 +13,7 @@
 
 use crate::{graph::Field, StructElement, StructRelation};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use petgraph::{graph::NodeIndex, Graph};
 use syn::{Data, DeriveInput, Fields};
@@ -72,7 +72,12 @@ pub fn run(
             let fields = fields_named
                 .named
                 .into_iter()
-                .map(|f| Field { syn: f })
+                .map(|f| Field {
+                    syn: f,
+                    idents: HashSet::new(),
+                    lifetimes: HashSet::new(),
+                    const_params: HashSet::new(),
+                })
                 .collect::<Vec<_>>();
             add_from_syn_list!(graph, map, fields, Field, FieldTrain);
         }
@@ -80,7 +85,12 @@ pub fn run(
             let fields = fields_unnamed
                 .unnamed
                 .into_iter()
-                .map(|f| Field { syn: f })
+                .map(|f| Field {
+                    syn: f,
+                    idents: HashSet::new(),
+                    lifetimes: HashSet::new(),
+                    const_params: HashSet::new(),
+                })
                 .collect::<Vec<_>>();
             add_from_syn_list!(graph, map, fields, Field, FieldTrain);
         }
