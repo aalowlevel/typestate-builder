@@ -13,19 +13,10 @@
 
 use crate::{StructElement, StructRelation};
 
-use std::{collections::HashMap, fs::File, io::Write};
+use std::collections::HashMap;
 
-use petgraph::{
-    dot::{Config, Dot},
-    graph::NodeIndex,
-    Graph,
-};
-use proc_macro_error::emit_call_site_warning;
-use quote::ToTokens;
-use syn::{
-    Attribute, ConstParam, Data, DataStruct, DeriveInput, Fields, FieldsNamed, Ident,
-    LifetimeParam, TypeParam, Visibility,
-};
+use petgraph::{graph::NodeIndex, Graph};
+use syn::{Data, DeriveInput, Fields};
 
 macro_rules! add_from_syn_list {
     ($graph:expr, $map:expr, $list:expr, $node:ident, $edge:ident) => {{

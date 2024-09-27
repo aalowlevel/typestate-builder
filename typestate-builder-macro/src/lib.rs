@@ -38,7 +38,6 @@
 //! ```
 
 #![warn(missing_docs)]
-#![allow(unused)]
 
 mod analyze;
 mod graph;
