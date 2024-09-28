@@ -11,7 +11,7 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 use syn::{GenericParam, WherePredicate};
@@ -144,25 +144,25 @@ fn search_in_wp(graph: &mut StructGraph, node_field: NodeIndex, node_wp: NodeInd
     }
 }
 
-// fn traverse(&self, graph: &Graph<NodeData, EdgeType>, start: NodeIndex) {
-//     let mut queue = VecDeque::new();
-//     let mut visited = HashSet::new();
+fn traverse(graph: &StructGraph, edge_type: &StructRelation, start: NodeIndex) {
+    let mut queue = VecDeque::new();
+    let mut visited = HashSet::new();
 
-//     queue.push_back(start);
-//     visited.insert(start);
+    queue.push_back(start);
+    visited.insert(start);
 
-//     while let Some(node) = queue.pop_front() {
-//         println!("Visiting node: {:?}", graph[node]);
+    while let Some(node) = queue.pop_front() {
+        println!("Visiting node: {:?}", graph[node]);
 
-//         for neighbor in graph.neighbors(node) {
-//             if !visited.contains(&neighbor) {
-//                 if let Some(edge) = graph.find_edge(node, neighbor) {
-//                     if &graph[edge] == self {
-//                         queue.push_back(neighbor);
-//                         visited.insert(neighbor);
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// }
+        for neighbor in graph.neighbors(node) {
+            if !visited.contains(&neighbor) {
+                if let Some(edge) = graph.find_edge(node, neighbor) {
+                    if &graph[edge] == edge_type {
+                        queue.push_back(neighbor);
+                        visited.insert(neighbor);
+                    }
+                }
+            }
+        }
+    }
+}

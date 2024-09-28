@@ -86,7 +86,7 @@ impl std::fmt::Debug for StructElement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum StructRelation {
     AttributeTrain,
     GenericTrain,
