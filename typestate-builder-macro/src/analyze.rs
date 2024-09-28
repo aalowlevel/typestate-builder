@@ -17,25 +17,19 @@ use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 use syn::{GenericParam, WherePredicate};
 
 use crate::{
-    graph::{StructElement, StructRelation},
+    graph::{StructElement, StructGraph, StructRelation},
     helper::extract_ident,
 };
 
 pub fn run(
-    graph: Graph<StructElement, StructRelation>,
+    graph: StructGraph,
     map: HashMap<String, NodeIndex>,
-) -> (
-    Graph<StructElement, StructRelation>,
-    HashMap<String, NodeIndex>,
-) {
+) -> (StructGraph, HashMap<String, NodeIndex>) {
     let graph = bind_field_elements(graph, &map);
     (graph, map)
 }
 
-fn bind_field_elements(
-    mut graph: Graph<StructElement, StructRelation>,
-    map: &HashMap<String, NodeIndex>,
-) -> Graph<StructElement, StructRelation> {
+fn bind_field_elements(mut graph: StructGraph, map: &HashMap<String, NodeIndex>) -> StructGraph {
     if let Some(mut dfs) = map.get("Field0").map(|start| Dfs::new(&graph, *start)) {
         // Traversal on field train.
         while let Some(node_field) = dfs.next(&graph) {
@@ -50,14 +44,14 @@ fn bind_field_elements(
 const ONLY_FIELD_MSG: &str = "Only Field is accepted.";
 const ONLY_GENERIC_MSG: &str = "Only Generic is accepted.";
 const ONLY_WP_MSG: &str = "Only Where Predicate is accepted.";
-fn list_field_assets(graph: &mut Graph<StructElement, StructRelation>, node_field: NodeIndex) {
+fn list_field_assets(graph: &mut StructGraph, node_field: NodeIndex) {
     let StructElement::Field(field) = &mut graph[node_field] else {
         panic!("{}", ONLY_FIELD_MSG);
     };
     field.list();
 }
 fn traversal_in_generics(
-    graph: &mut Graph<StructElement, StructRelation>,
+    graph: &mut StructGraph,
     node_field: NodeIndex,
     map: &HashMap<String, NodeIndex>,
 ) {
@@ -69,11 +63,7 @@ fn traversal_in_generics(
     }
 }
 /** Checks whether any element in the field is defined in the generics. If it is defined, establishes a connection. */
-fn search_in_generics(
-    graph: &mut Graph<StructElement, StructRelation>,
-    node_field: NodeIndex,
-    node_generic: NodeIndex,
-) {
+fn search_in_generics(graph: &mut StructGraph, node_field: NodeIndex, node_generic: NodeIndex) {
     let StructElement::Generic(generic) = &graph[node_generic] else {
         panic!("{}", ONLY_GENERIC_MSG);
     };
@@ -106,7 +96,7 @@ fn search_in_generics(
     }
 }
 fn traversal_in_where_clause(
-    graph: &mut Graph<StructElement, StructRelation>,
+    graph: &mut StructGraph,
     node_field: NodeIndex,
     map: &HashMap<String, NodeIndex>,
 ) {
@@ -121,11 +111,7 @@ fn traversal_in_where_clause(
     }
 }
 /** Checks whether any element in the field is defined in where clause of the generics. If it is defined, establishes a connection. */
-fn search_in_wp(
-    graph: &mut Graph<StructElement, StructRelation>,
-    node_field: NodeIndex,
-    node_wp: NodeIndex,
-) {
+fn search_in_wp(graph: &mut StructGraph, node_field: NodeIndex, node_wp: NodeIndex) {
     let StructElement::WherePredicate(wp) = &graph[node_wp] else {
         panic!("{}", ONLY_WP_MSG);
     };
@@ -157,3 +143,26 @@ fn search_in_wp(
         );
     }
 }
+
+// fn traverse(&self, graph: &Graph<NodeData, EdgeType>, start: NodeIndex) {
+//     let mut queue = VecDeque::new();
+//     let mut visited = HashSet::new();
+
+//     queue.push_back(start);
+//     visited.insert(start);
+
+//     while let Some(node) = queue.pop_front() {
+//         println!("Visiting node: {:?}", graph[node]);
+
+//         for neighbor in graph.neighbors(node) {
+//             if !visited.contains(&neighbor) {
+//                 if let Some(edge) = graph.find_edge(node, neighbor) {
+//                     if &graph[edge] == self {
+//                         queue.push_back(neighbor);
+//                         visited.insert(neighbor);
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }

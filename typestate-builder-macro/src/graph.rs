@@ -13,6 +13,7 @@
 
 use std::collections::HashSet;
 
+use petgraph::Graph;
 use serde::{ser::SerializeStruct, Serialize};
 use syn::{
     Attribute, Expr, ExprPath, GenericArgument, GenericParam, Ident, Lifetime, PathArguments, Type,
@@ -94,6 +95,8 @@ pub enum StructRelation {
     FieldGenericsInMain,
     FieldGenericsInWhereClause,
 }
+
+pub type StructGraph = Graph<StructElement, StructRelation>;
 
 #[derive(Debug)]
 pub struct Field {
