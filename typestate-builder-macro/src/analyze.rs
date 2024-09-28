@@ -19,12 +19,17 @@ use syn::{GenericParam, WherePredicate};
 use crate::{
     graph::{StructElement, StructRelation},
     helper::extract_ident,
-    write_graph_to_file,
 };
 
-pub fn run(graph: Graph<StructElement, StructRelation>, map: HashMap<String, NodeIndex>) {
+pub fn run(
+    graph: Graph<StructElement, StructRelation>,
+    map: HashMap<String, NodeIndex>,
+) -> (
+    Graph<StructElement, StructRelation>,
+    HashMap<String, NodeIndex>,
+) {
     let graph = bind_field_elements(graph, &map);
-    write_graph_to_file(&graph, "example.dot").unwrap();
+    (graph, map)
 }
 
 fn bind_field_elements(

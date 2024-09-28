@@ -45,10 +45,8 @@ mod helper;
 mod parse;
 mod produce;
 
-use std::{fs::File, io::Write};
-
 use graph::{StructElement, StructRelation};
-use petgraph::{dot::Dot, Graph};
+use helper::write_graph_to_file;
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use quote::quote;
@@ -68,7 +66,7 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
 
     // Firstly, we need to parse input data.
     let (graph, map) = parse::run(input);
-    analyze::run(graph, map);
+    let (graph, map) = analyze::run(graph, map);
 
     // // Combine the generated code into a final token stream.
     // let output = quote! {
@@ -79,17 +77,6 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     //     #build_method
     // };
 
-    // // Return the generated code.
-    // output.into()
+    write_graph_to_file(&graph, "example.dot").unwrap();
     quote! {}.into()
-}
-
-fn write_graph_to_file(
-    graph: &Graph<StructElement, StructRelation>,
-    filename: &str,
-) -> std::io::Result<()> {
-    let dot = format!("{:?}", Dot::new(graph));
-    let mut file = File::create(filename)?;
-    file.write_all(dot.as_bytes())?;
-    Ok(())
 }
