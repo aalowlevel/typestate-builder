@@ -31,32 +31,64 @@ fn bind_field_elements(
 ) -> Graph<StructElement, StructRelation> {
     if let Some(mut dfs) = map.get("Field0").map(|start| Dfs::new(&graph, *start)) {
         // Traversal on field train.
-        while let Some(node) = dfs.next(&graph) {
-            list_field_assets(&mut graph, node);
-            search_in_generics(&mut graph, node, map);
+        while let Some(node_field) = dfs.next(&graph) {
+            list_field_assets(&mut graph, node_field);
+            traversal_in_generics(&mut graph, node_field, map);
         }
     }
     graph
 }
 
 const ONLY_FIELD_MSG: &str = "Only Field is accepted.";
-fn list_field_assets(graph: &mut Graph<StructElement, StructRelation>, node: NodeIndex) {
-    let StructElement::Field(field) = &mut graph[node] else {
+const ONLY_GENERIC_MSG: &str = "Only Generic is accepted.";
+fn list_field_assets(graph: &mut Graph<StructElement, StructRelation>, node_field: NodeIndex) {
+    let StructElement::Field(field) = &mut graph[node_field] else {
         panic!("{}", ONLY_FIELD_MSG);
     };
     field.list();
 }
-fn search_in_generics(
+fn traversal_in_generics(
     graph: &mut Graph<StructElement, StructRelation>,
-    node: NodeIndex,
+    node_field: NodeIndex,
     map: &HashMap<String, NodeIndex>,
 ) {
-    let StructElement::Field(field) = &graph[node] else {
-        panic!("{}", ONLY_FIELD_MSG);
-    };
-
     if let Some(mut dfs) = map.get("Generic0").map(|start| Dfs::new(&*graph, *start)) {
         // Traversal on generic train.
-        while let Some(node) = dfs.next(&*graph) {}
+        while let Some(node_generic) = dfs.next(&*graph) {
+            search_in_generics(graph, node_field, node_generic);
+        }
+    }
+}
+/** Checks whether any element in the field is defined in the generics. If it is defined, establishes a connection. */
+fn search_in_generics(
+    graph: &mut Graph<StructElement, StructRelation>,
+    node_field: NodeIndex,
+    node_generic: NodeIndex,
+) {
+    let StructElement::Generic(generic) = &graph[node_generic] else {
+        panic!("{}", ONLY_GENERIC_MSG);
+    };
+    let generic_ident = match generic {
+        syn::GenericParam::Lifetime(lifetime_param) => &lifetime_param.lifetime.ident,
+        syn::GenericParam::Type(type_param) => &type_param.ident,
+        syn::GenericParam::Const(const_param) => &const_param.ident,
+    };
+    let StructElement::Field(field) = &graph[node_field] else {
+        panic!("{}", ONLY_FIELD_MSG);
+    };
+    let found = field
+        .idents
+        .iter()
+        .any(|type_ident| type_ident == generic_ident)
+        || field
+            .lifetimes
+            .iter()
+            .any(|lifetime| &lifetime.ident == generic_ident)
+        || field
+            .const_params
+            .iter()
+            .any(|const_param_ident| const_param_ident == generic_ident);
+    if found {
+        graph.add_edge(node_field, node_generic, StructRelation::FieldGenerics);
     }
 }
