@@ -41,6 +41,7 @@
 
 mod analyze;
 mod graph;
+mod helper;
 mod parse;
 mod produce;
 

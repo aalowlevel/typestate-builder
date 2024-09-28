@@ -14,9 +14,11 @@
 use std::collections::HashMap;
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
+use syn::{GenericParam, WherePredicate};
 
 use crate::{
     graph::{StructElement, StructRelation},
+    helper::extract_ident,
     write_graph_to_file,
 };
 
@@ -34,6 +36,7 @@ fn bind_field_elements(
         while let Some(node_field) = dfs.next(&graph) {
             list_field_assets(&mut graph, node_field);
             traversal_in_generics(&mut graph, node_field, map);
+            traversal_in_where_clause(&mut graph, node_field, map);
         }
     }
     graph
@@ -41,6 +44,7 @@ fn bind_field_elements(
 
 const ONLY_FIELD_MSG: &str = "Only Field is accepted.";
 const ONLY_GENERIC_MSG: &str = "Only Generic is accepted.";
+const ONLY_WP_MSG: &str = "Only Where Predicate is accepted.";
 fn list_field_assets(graph: &mut Graph<StructElement, StructRelation>, node_field: NodeIndex) {
     let StructElement::Field(field) = &mut graph[node_field] else {
         panic!("{}", ONLY_FIELD_MSG);
@@ -69,9 +73,9 @@ fn search_in_generics(
         panic!("{}", ONLY_GENERIC_MSG);
     };
     let generic_ident = match generic {
-        syn::GenericParam::Lifetime(lifetime_param) => &lifetime_param.lifetime.ident,
-        syn::GenericParam::Type(type_param) => &type_param.ident,
-        syn::GenericParam::Const(const_param) => &const_param.ident,
+        GenericParam::Lifetime(lifetime_param) => &lifetime_param.lifetime.ident,
+        GenericParam::Type(type_param) => &type_param.ident,
+        GenericParam::Const(const_param) => &const_param.ident,
     };
     let StructElement::Field(field) = &graph[node_field] else {
         panic!("{}", ONLY_FIELD_MSG);
@@ -89,6 +93,62 @@ fn search_in_generics(
             .iter()
             .any(|const_param_ident| const_param_ident == generic_ident);
     if found {
-        graph.add_edge(node_field, node_generic, StructRelation::FieldGenerics);
+        graph.add_edge(
+            node_field,
+            node_generic,
+            StructRelation::FieldGenericsInMain,
+        );
+    }
+}
+fn traversal_in_where_clause(
+    graph: &mut Graph<StructElement, StructRelation>,
+    node_field: NodeIndex,
+    map: &HashMap<String, NodeIndex>,
+) {
+    if let Some(mut dfs) = map
+        .get("WherePredicate0")
+        .map(|start| Dfs::new(&*graph, *start))
+    {
+        // Traversal on where predicate train.
+        while let Some(node_wp) = dfs.next(&*graph) {
+            search_in_wp(graph, node_field, node_wp);
+        }
+    }
+}
+/** Checks whether any element in the field is defined in where clause of the generics. If it is defined, establishes a connection. */
+fn search_in_wp(
+    graph: &mut Graph<StructElement, StructRelation>,
+    node_field: NodeIndex,
+    node_wp: NodeIndex,
+) {
+    let StructElement::WherePredicate(wp) = &graph[node_wp] else {
+        panic!("{}", ONLY_WP_MSG);
+    };
+    let wp_ident = match wp {
+        WherePredicate::Lifetime(predicate_lifetime) => Some(&predicate_lifetime.lifetime.ident),
+        WherePredicate::Type(predicate_type) => extract_ident(&predicate_type.bounded_ty),
+        _ => None,
+    };
+    let StructElement::Field(field) = &graph[node_field] else {
+        panic!("{}", ONLY_FIELD_MSG);
+    };
+    let found = field
+        .idents
+        .iter()
+        .any(|type_ident| Some(type_ident) == wp_ident)
+        || field
+            .lifetimes
+            .iter()
+            .any(|lifetime| Some(&lifetime.ident) == wp_ident)
+        || field
+            .const_params
+            .iter()
+            .any(|const_param_ident| Some(const_param_ident) == wp_ident);
+    if found {
+        graph.add_edge(
+            node_field,
+            node_wp,
+            StructRelation::FieldGenericsInWhereClause,
+        );
     }
 }
