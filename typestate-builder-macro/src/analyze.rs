@@ -17,8 +17,8 @@ use syn::{GenericParam, WherePredicate};
 
 use crate::{
     graph::{
-        traverse_by_edge_mut, StructElement, StructGraph, StructRelation, FIELD_START_P,
-        GENERICS_START_P, WHERE_PREDICATE_START_P,
+        traverse_mut, StructElement, StructGraph, StructRelation, FIELD_START_P, GENERICS_START_P,
+        WHERE_PREDICATE_START_P,
     },
     helper::extract_ident,
 };
@@ -33,15 +33,17 @@ pub fn run(
 
 fn bind_field_elements(mut graph: StructGraph, map: &IndexMap<String, NodeIndex>) -> StructGraph {
     if let Some(start) = map.get(FIELD_START_P) {
-        list_field_assets(&mut graph, *start);
-        traversal_in_generics(&mut graph, *start, map);
-        traversal_in_where_clause(&mut graph, *start, map);
         let action = |graph: &mut StructGraph, _edge, node_field| {
             list_field_assets(graph, node_field);
             traversal_in_generics(graph, node_field, map);
             traversal_in_where_clause(graph, node_field, map);
         };
-        traverse_by_edge_mut(&mut graph, &StructRelation::FieldTrain, *start, action);
+        traverse_mut(
+            &mut graph,
+            Some(&StructRelation::FieldTrain),
+            *start,
+            action,
+        );
     }
     graph
 }
@@ -61,11 +63,10 @@ fn traversal_in_generics(
     map: &IndexMap<String, NodeIndex>,
 ) {
     if let Some(start) = map.get(GENERICS_START_P) {
-        search_in_generics(graph, node_field, *start);
         let action = |graph: &mut StructGraph, _edge, node_generic| {
             search_in_generics(graph, node_field, node_generic);
         };
-        traverse_by_edge_mut(graph, &StructRelation::GenericTrain, *start, action);
+        traverse_mut(graph, Some(&StructRelation::GenericTrain), *start, action);
     }
 }
 /** Checks whether any element in the field is defined in the generics. If it is defined, establishes a connection. */
@@ -107,12 +108,16 @@ fn traversal_in_where_clause(
     map: &IndexMap<String, NodeIndex>,
 ) {
     if let Some(start) = map.get(WHERE_PREDICATE_START_P) {
-        search_in_wp(graph, node_field, *start);
         let action = |graph: &mut StructGraph, _edge, node_wp| {
             search_in_wp(graph, node_field, node_wp);
         };
 
-        traverse_by_edge_mut(graph, &StructRelation::WherePredicateTrain, *start, action);
+        traverse_mut(
+            graph,
+            Some(&StructRelation::WherePredicateTrain),
+            *start,
+            action,
+        );
     }
 }
 /** Checks whether any element in the field is defined in where clause of the generics. If it is defined, establishes a connection. */

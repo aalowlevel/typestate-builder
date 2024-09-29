@@ -309,16 +309,18 @@ impl Serialize for WherePredicate {
 
 pub fn traverse_by_edge<'a, F>(
     graph: &'a StructGraph,
-    edge_type: &'a StructRelation,
-    start: NodeIndex,
+    edge_type: Option<&'a StructRelation>,
+    start_node: NodeIndex,
     mut node_action: F,
 ) -> IndexSet<NodeIndex>
 where
-    F: FnMut(&StructGraph, EdgeIndex, NodeIndex),
+    F: FnMut(&StructGraph, Option<EdgeIndex>, NodeIndex),
 {
     let mut queue = VecDeque::new();
     let mut visited = IndexSet::new();
-    queue.push_back(start);
+    queue.push_back(start_node);
+
+    node_action(graph, None, start_node);
 
     while let Some(node) = queue.pop_front() {
         if visited.insert(node) {
@@ -326,17 +328,21 @@ where
                 .neighbors(node)
                 .filter_map(|neighbor| {
                     graph.find_edge(node, neighbor).and_then(|edge| {
-                        if &graph[edge] == edge_type {
-                            Some((edge, neighbor))
+                        if let Some(edge_type) = edge_type {
+                            if &graph[edge] == edge_type {
+                                Some((edge, neighbor))
+                            } else {
+                                None
+                            }
                         } else {
-                            None
+                            Some((edge, neighbor))
                         }
                     })
                 })
                 .collect();
 
             for (edge, neighbor) in neighbors {
-                node_action(graph, edge, neighbor);
+                node_action(graph, Some(edge), neighbor);
                 if !visited.contains(&neighbor) {
                     queue.push_back(neighbor);
                 }
@@ -346,18 +352,20 @@ where
     visited
 }
 
-pub fn traverse_by_edge_mut<'a, F>(
+pub fn traverse_mut<'a, F>(
     graph: &'a mut StructGraph,
-    edge_type: &'a StructRelation,
+    edge_type: Option<&'a StructRelation>,
     start_node: NodeIndex,
     mut node_action: F,
 ) -> IndexSet<NodeIndex>
 where
-    F: FnMut(&mut StructGraph, EdgeIndex, NodeIndex),
+    F: FnMut(&mut StructGraph, Option<EdgeIndex>, NodeIndex),
 {
     let mut queue = VecDeque::new();
     let mut visited = IndexSet::new();
     queue.push_back(start_node);
+
+    node_action(graph, None, start_node);
 
     while let Some(node) = queue.pop_front() {
         if visited.insert(node) {
@@ -365,17 +373,21 @@ where
                 .neighbors(node)
                 .filter_map(|neighbor| {
                     graph.find_edge(node, neighbor).and_then(|edge| {
-                        if &graph[edge] == edge_type {
-                            Some((edge, neighbor))
+                        if let Some(edge_type) = edge_type {
+                            if &graph[edge] == edge_type {
+                                Some((edge, neighbor))
+                            } else {
+                                None
+                            }
                         } else {
-                            None
+                            Some((edge, neighbor))
                         }
                     })
                 })
                 .collect();
 
             for (edge, neighbor) in neighbors {
-                node_action(graph, edge, neighbor);
+                node_action(graph, Some(edge), neighbor);
                 if !visited.contains(&neighbor) {
                     queue.push_back(neighbor);
                 }

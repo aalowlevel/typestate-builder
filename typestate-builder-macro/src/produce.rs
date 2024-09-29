@@ -16,7 +16,6 @@ use std::borrow::Cow;
 use indexmap::IndexMap;
 use petgraph::graph::NodeIndex;
 use proc_macro2::Span;
-use proc_macro_error::emit_call_site_warning;
 use syn::Ident;
 
 use crate::graph::{traverse_by_edge, StructElement, StructGraph, StructRelation, FIELD_START_P};
@@ -58,11 +57,10 @@ impl<'a> BuilderStatePair<'a> {
             };
 
             let builder_state_pair = BuilderStatePair { main_ident, ident };
-            // emit_call_site_warning!(format!("{:?}", builder_state_pair));
         };
 
         if let Some(start) = map.get(FIELD_START_P) {
-            traverse_by_edge(&graph, &StructRelation::FieldTrain, *start, action);
+            traverse_by_edge(&graph, Some(&StructRelation::FieldTrain), *start, action);
         }
         (graph, map)
     }
