@@ -59,8 +59,13 @@ impl BuilderStates {
                 .into_iter()
                 .map(|(_k, v)| v)
                 .collect::<Vec<_>>();
+            let generics = if to_main_generics.is_empty() {
+                quote! {}
+            } else {
+                quote! { < #(#to_main_generics),* > }
+            };
             quote! {
-                struct #ident_added< #(#to_main_generics),* >(#ty);
+                struct #ident_added #generics(#ty);
                 struct #ident_empty;
             }
         };
