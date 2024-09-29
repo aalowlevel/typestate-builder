@@ -46,17 +46,13 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     // Firstly, we need to parse input data.
     let (mut graph, map) = parse::run(input);
     analyze::run(&mut graph, &map);
-    let (graph, map) = produce::run(graph, map);
+    let (graph, _map, res) = produce::run(graph, map);
 
-    // // Combine the generated code into a final token stream.
-    // let output = quote! {
-    //     #(#state_structs)*
-    //     #builder_struct
-    //     #builder_method
-    //     #(#builder_constructor_methods)*
-    //     #build_method
-    // };
+    // Combine the generated code into a final token stream.
+    let output = quote! {
+        #(#res)*
+    };
 
     write_graph_to_file(&graph, "example.dot").unwrap();
-    quote! {}.into()
+    output.into()
 }

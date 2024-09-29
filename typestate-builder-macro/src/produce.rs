@@ -19,21 +19,26 @@ use petgraph::graph::EdgeIndex;
 use petgraph::graph::NodeIndex;
 use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
+use quote::format_ident;
 use quote::quote;
 use syn::Ident;
 use syn::Type;
 
 use crate::graph::{traverse, StructElement, StructGraph, StructRelation, FIELD_START_P};
+use crate::helper::ident_to_titlecase;
 
 pub fn run(
     graph: StructGraph,
     map: IndexMap<String, NodeIndex>,
-) -> (StructGraph, IndexMap<String, NodeIndex>) {
-    let builder_states = BuilderStates::run(&graph, &map);
-    (graph, map)
+) -> (StructGraph, IndexMap<String, NodeIndex>, Vec<TokenStream2>) {
+    let mut res = Vec::new();
+    if let Some(builder_states) = BuilderStates::run(&graph, &map) {
+        res.extend(builder_states.into_iter().map(|(_k, v)| v));
+    }
+    // proc_macro_error::emit_call_site_warning!(format!("{:#?}", builder_states));
+    (graph, map, res)
 }
 
-#[derive(Debug)]
 struct BuilderStates;
 
 impl BuilderStates {
@@ -42,9 +47,22 @@ impl BuilderStates {
         map: &IndexMap<String, NodeIndex>,
     ) -> Option<IndexMap<NodeIndex, TokenStream2>> {
         let action = |graph: &StructGraph, _edge, field_node| -> TokenStream2 {
-            let builder_state_pair = BuilderStatePair::new(graph, field_node, map);
-
-            quote! {}
+            let BuilderStatePair {
+                main_ident,
+                ident,
+                ty,
+                to_main_generics,
+            } = BuilderStatePair::new(graph, field_node, map);
+            let ident_added = format_ident!("{}{}Added", main_ident, ident_to_titlecase(&ident));
+            let ident_empty = format_ident!("{}{}Empty", main_ident, ident_to_titlecase(&ident));
+            let to_main_generics = to_main_generics
+                .into_iter()
+                .map(|(_k, v)| v)
+                .collect::<Vec<_>>();
+            quote! {
+                struct #ident_added< #(#to_main_generics),* >(#ty);
+                struct #ident_empty;
+            }
         };
 
         map.get(FIELD_START_P).map(|start| {
@@ -59,7 +77,6 @@ impl BuilderStates {
     }
 }
 
-#[derive(Debug)]
 struct BuilderStatePair<'a> {
     main_ident: &'a Ident,
     ident: Cow<'a, Ident>,

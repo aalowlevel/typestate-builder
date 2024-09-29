@@ -7,7 +7,7 @@ fn main() {}
 pub(crate) trait MyTrait {}
 
 #[derive(TypestateBuilder)]
-pub(crate) struct MultiBoundGeneric<'a, T, const L: usize, U, V>
+pub(crate) struct MultiBoundGeneric<'a, T, B, const L: usize, U, V>
 where
     T: Clone + Default + std::fmt::Debug,
     U: Into<String> + Copy,
@@ -16,7 +16,7 @@ where
     item1: T,
     item2: U,
     data: Vec<T>,
-    borrowed: &'a str,
+    borrowed: &'a B,
     consted: [u32; L],
     my_trait: V,
 }

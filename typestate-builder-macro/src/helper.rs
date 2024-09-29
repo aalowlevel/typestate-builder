@@ -55,3 +55,17 @@ pub fn write_graph_to_file<N: std::fmt::Debug, E: std::fmt::Debug>(
     file.write_all(dot.as_bytes())?;
     Ok(())
 }
+
+pub fn ident_to_titlecase(syn: &syn::Ident) -> String {
+    let node_name = syn.to_string();
+    node_name
+        .split('_')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().chain(chars).collect(),
+            }
+        })
+        .collect()
+}
