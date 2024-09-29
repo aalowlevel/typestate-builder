@@ -12,6 +12,7 @@
 // be dual licensed as above, without any additional terms or conditions.
 
 use std::borrow::Cow;
+use std::rc::Rc;
 
 use indexmap::IndexMap;
 use petgraph::graph::EdgeIndex;
@@ -63,7 +64,7 @@ struct BuilderStatePair<'a> {
     main_ident: &'a Ident,
     ident: Cow<'a, Ident>,
     ty: &'a Type,
-    to_main_generics: IndexMap<NodeIndex, syn::GenericParam>,
+    to_main_generics: IndexMap<NodeIndex, Rc<syn::GenericParam>>,
 }
 
 impl<'a> BuilderStatePair<'a> {
@@ -106,11 +107,11 @@ impl<'a> BuilderStatePair<'a> {
         graph: &StructGraph,
         _edge: Option<EdgeIndex>,
         generic_node: NodeIndex,
-    ) -> syn::GenericParam {
+    ) -> Rc<syn::GenericParam> {
         let StructElement::Generic(generic) = &graph[generic_node] else {
             panic!("Node must be a generic.");
         };
-        generic.syn.clone()
+        Rc::clone(&generic.syn)
     }
 }
 

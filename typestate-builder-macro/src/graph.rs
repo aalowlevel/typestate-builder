@@ -11,7 +11,7 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use std::collections::VecDeque;
+use std::{collections::VecDeque, rc::Rc};
 
 use indexmap::{IndexMap, IndexSet};
 use petgraph::{
@@ -275,7 +275,7 @@ impl Field {
 
 pub struct GenericParam {
     pub nth: usize,
-    pub syn: syn::GenericParam,
+    pub syn: Rc<syn::GenericParam>,
 }
 
 impl Serialize for GenericParam {

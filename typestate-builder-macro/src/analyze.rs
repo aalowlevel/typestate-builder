@@ -76,7 +76,7 @@ fn search_in_generics(graph: &mut StructGraph, node_field: NodeIndex, node_gener
     let StructElement::Generic(generic) = &graph[node_generic] else {
         panic!("{}", ONLY_GENERIC_MSG);
     };
-    let generic_ident = match &generic.syn {
+    let generic_ident = match generic.syn.as_ref() {
         GenericParam::Lifetime(lifetime_param) => &lifetime_param.lifetime.ident,
         GenericParam::Type(type_param) => &type_param.ident,
         GenericParam::Const(const_param) => &const_param.ident,

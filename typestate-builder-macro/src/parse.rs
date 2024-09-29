@@ -11,6 +11,8 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
+use std::rc::Rc;
+
 use crate::{
     graph::{Field, GenericParam, StructGraph, WherePredicate},
     StructElement, StructRelation,
@@ -58,7 +60,10 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
         .params
         .into_iter()
         .enumerate()
-        .map(|(nth, syn)| GenericParam { nth, syn })
+        .map(|(nth, syn)| GenericParam {
+            nth,
+            syn: Rc::new(syn),
+        })
         .collect::<Vec<_>>();
     add_from_list!(graph, map, generics, Generic, GenericTrain);
 
