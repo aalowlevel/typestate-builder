@@ -39,21 +39,7 @@ impl BuilderStates {
         map: &IndexMap<String, NodeIndex>,
     ) -> Option<IndexMap<NodeIndex, TokenStream2>> {
         let action = |graph: &StructGraph, _edge, field_node| -> TokenStream2 {
-            let StructElement::Field(field) = &graph[field_node] else {
-                panic!("Node must be a field.");
-            };
-            let Some(StructElement::Ident(main_ident)) = map.get("Ident").map(|f| &graph[*f])
-            else {
-                panic!("Struct must have an ident.");
-            };
-            let ident = if let Some(ident) = &field.syn.ident {
-                Cow::Borrowed(ident)
-            } else {
-                Cow::Owned(Ident::new(
-                    &format!("field{}", field.nth),
-                    Span::call_site(),
-                ))
-            };
+            let builder_state_pair = BuilderStatePair::new(graph, field_node, map);
 
             quote! {}
         };
@@ -74,6 +60,30 @@ impl BuilderStates {
 struct BuilderStatePair<'a> {
     main_ident: &'a Ident,
     ident: Cow<'a, Ident>,
+}
+
+impl<'a> BuilderStatePair<'a> {
+    fn new(
+        graph: &'a StructGraph,
+        field_node: NodeIndex,
+        map: &'a IndexMap<String, NodeIndex>,
+    ) -> Self {
+        let StructElement::Field(field) = &graph[field_node] else {
+            panic!("Node must be a field.");
+        };
+        let Some(StructElement::Ident(main_ident)) = map.get("Ident").map(|f| &graph[*f]) else {
+            panic!("Struct must have an ident.");
+        };
+        let ident = if let Some(ident) = &field.syn.ident {
+            Cow::Borrowed(ident)
+        } else {
+            Cow::Owned(Ident::new(
+                &format!("field{}", field.nth),
+                Span::call_site(),
+            ))
+        };
+        Self { main_ident, ident }
+    }
 }
 
 struct Builder {}
