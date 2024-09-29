@@ -40,8 +40,9 @@ fn bind_field_elements(mut graph: StructGraph, map: &IndexMap<String, NodeIndex>
         };
         traverse_mut(
             &mut graph,
-            Some(&StructRelation::FieldTrain),
+            Some(&[&StructRelation::FieldTrain]),
             *start,
+            true,
             action,
         );
     }
@@ -66,7 +67,13 @@ fn traversal_in_generics(
         let action = |graph: &mut StructGraph, _edge, node_generic| {
             search_in_generics(graph, node_field, node_generic);
         };
-        traverse_mut(graph, Some(&StructRelation::GenericTrain), *start, action);
+        traverse_mut(
+            graph,
+            Some(&[&StructRelation::GenericTrain]),
+            *start,
+            true,
+            action,
+        );
     }
 }
 /** Checks whether any element in the field is defined in the generics. If it is defined, establishes a connection. */
@@ -114,8 +121,9 @@ fn traversal_in_where_clause(
 
         traverse_mut(
             graph,
-            Some(&StructRelation::WherePredicateTrain),
+            Some(&[&StructRelation::WherePredicateTrain]),
             *start,
+            true,
             action,
         );
     }

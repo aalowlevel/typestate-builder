@@ -307,20 +307,24 @@ impl Serialize for WherePredicate {
     }
 }
 
-pub fn traverse_by_edge<'a, F>(
-    graph: &'a StructGraph,
-    edge_type: Option<&'a StructRelation>,
+pub fn traverse<'a, N, E, F>(
+    graph: &'a Graph<N, E>,
+    filter_edge: Option<&'a [&'a E]>,
     start_node: NodeIndex,
+    include_start: bool,
     mut node_action: F,
 ) -> IndexSet<NodeIndex>
 where
-    F: FnMut(&StructGraph, Option<EdgeIndex>, NodeIndex),
+    F: FnMut(&Graph<N, E>, Option<EdgeIndex>, NodeIndex),
+    E: std::cmp::PartialEq,
 {
     let mut queue = VecDeque::new();
     let mut visited = IndexSet::new();
     queue.push_back(start_node);
 
-    node_action(graph, None, start_node);
+    if include_start {
+        node_action(graph, None, start_node);
+    }
 
     while let Some(node) = queue.pop_front() {
         if visited.insert(node) {
@@ -328,12 +332,11 @@ where
                 .neighbors(node)
                 .filter_map(|neighbor| {
                     graph.find_edge(node, neighbor).and_then(|edge| {
-                        if let Some(edge_type) = edge_type {
-                            if &graph[edge] == edge_type {
-                                Some((edge, neighbor))
-                            } else {
-                                None
-                            }
+                        if let Some(filter_edge) = filter_edge {
+                            filter_edge
+                                .iter()
+                                .find(|&&p| p == &graph[edge])
+                                .map(|_| (edge, neighbor))
                         } else {
                             Some((edge, neighbor))
                         }
@@ -352,20 +355,24 @@ where
     visited
 }
 
-pub fn traverse_mut<'a, F>(
-    graph: &'a mut StructGraph,
-    edge_type: Option<&'a StructRelation>,
+pub fn traverse_mut<'a, N, E, F>(
+    graph: &'a mut Graph<N, E>,
+    filter_edge: Option<&'a [&'a E]>,
     start_node: NodeIndex,
+    include_start: bool,
     mut node_action: F,
 ) -> IndexSet<NodeIndex>
 where
-    F: FnMut(&mut StructGraph, Option<EdgeIndex>, NodeIndex),
+    F: FnMut(&mut Graph<N, E>, Option<EdgeIndex>, NodeIndex),
+    E: std::cmp::PartialEq,
 {
     let mut queue = VecDeque::new();
     let mut visited = IndexSet::new();
     queue.push_back(start_node);
 
-    node_action(graph, None, start_node);
+    if include_start {
+        node_action(graph, None, start_node);
+    }
 
     while let Some(node) = queue.pop_front() {
         if visited.insert(node) {
@@ -373,12 +380,11 @@ where
                 .neighbors(node)
                 .filter_map(|neighbor| {
                     graph.find_edge(node, neighbor).and_then(|edge| {
-                        if let Some(edge_type) = edge_type {
-                            if &graph[edge] == edge_type {
-                                Some((edge, neighbor))
-                            } else {
-                                None
-                            }
+                        if let Some(filter_edge) = filter_edge {
+                            filter_edge
+                                .iter()
+                                .find(|&&p| p == &graph[edge])
+                                .map(|_| (edge, neighbor))
                         } else {
                             Some((edge, neighbor))
                         }

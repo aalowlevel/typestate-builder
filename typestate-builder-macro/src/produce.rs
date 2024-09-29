@@ -18,7 +18,7 @@ use petgraph::graph::NodeIndex;
 use proc_macro2::Span;
 use syn::Ident;
 
-use crate::graph::{traverse_by_edge, StructElement, StructGraph, StructRelation, FIELD_START_P};
+use crate::graph::{traverse, StructElement, StructGraph, StructRelation, FIELD_START_P};
 
 pub fn run(
     graph: StructGraph,
@@ -60,7 +60,13 @@ impl<'a> BuilderStatePair<'a> {
         };
 
         if let Some(start) = map.get(FIELD_START_P) {
-            traverse_by_edge(&graph, Some(&StructRelation::FieldTrain), *start, action);
+            traverse(
+                &graph,
+                Some(&[&StructRelation::FieldTrain]),
+                *start,
+                true,
+                action,
+            );
         }
         (graph, map)
     }
