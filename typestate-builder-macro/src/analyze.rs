@@ -17,7 +17,10 @@ use proc_macro_error::emit_call_site_warning;
 use syn::{GenericParam, WherePredicate};
 
 use crate::{
-    graph::{traverse_by_edge_mut, StructElement, StructGraph, StructRelation},
+    graph::{
+        traverse_by_edge_mut, StructElement, StructGraph, StructRelation, FIELD_START_P,
+        GENERICS_START_P, WHERE_PREDICATE_START_P,
+    },
     helper::extract_ident,
 };
 
@@ -30,7 +33,7 @@ pub fn run(
 }
 
 fn bind_field_elements(mut graph: StructGraph, map: &IndexMap<String, NodeIndex>) -> StructGraph {
-    if let Some(start) = map.get("Field0") {
+    if let Some(start) = map.get(FIELD_START_P) {
         let action = |graph: &mut StructGraph, node, _edge| {
             list_field_assets(graph, node);
             traversal_in_generics(graph, node, map);
@@ -55,7 +58,7 @@ fn traversal_in_generics(
     node_field: NodeIndex,
     map: &IndexMap<String, NodeIndex>,
 ) {
-    if let Some(start) = map.get("Generic0") {
+    if let Some(start) = map.get(GENERICS_START_P) {
         let action = |graph: &mut StructGraph, node_generic, _edge| {
             search_in_generics(graph, node_field, node_generic);
         };
@@ -100,7 +103,7 @@ fn traversal_in_where_clause(
     node_field: NodeIndex,
     map: &IndexMap<String, NodeIndex>,
 ) {
-    if let Some(start) = map.get("WherePredicate0") {
+    if let Some(start) = map.get(WHERE_PREDICATE_START_P) {
         let action = |graph: &mut StructGraph, node_wp, _edge| {
             search_in_wp(graph, node_field, node_wp);
         };

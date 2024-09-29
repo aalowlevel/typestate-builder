@@ -46,6 +46,7 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     // Firstly, we need to parse input data.
     let (graph, map) = parse::run(input);
     let (graph, map) = analyze::run(graph, map);
+    let (graph, map) = produce::run(graph, map);
 
     // // Combine the generated code into a final token stream.
     // let output = quote! {

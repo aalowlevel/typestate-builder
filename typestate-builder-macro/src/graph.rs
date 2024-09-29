@@ -25,6 +25,10 @@ use syn::{
 };
 use syn_serde::Syn;
 
+pub const FIELD_START_P: &str = "Field0";
+pub const GENERICS_START_P: &str = "Generic0";
+pub const WHERE_PREDICATE_START_P: &str = "WherePredicate0";
+
 pub enum StructElement {
     Visibility(Visibility),
     Ident(Ident),
