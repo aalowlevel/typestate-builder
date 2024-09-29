@@ -13,7 +13,7 @@
 
 use std::collections::VecDeque;
 
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use petgraph::{
     graph::{EdgeIndex, NodeIndex},
     Graph,
@@ -306,24 +306,25 @@ impl Serialize for WherePredicate {
         res.end()
     }
 }
-
-pub fn traverse<'a, N, E, F>(
+pub fn traverse<'a, N, E, F, R>(
     graph: &'a Graph<N, E>,
     filter_edge: Option<&'a [&'a E]>,
     start_node: NodeIndex,
     include_start: bool,
     mut node_action: F,
-) -> IndexSet<NodeIndex>
+) -> IndexMap<NodeIndex, R>
 where
-    F: FnMut(&Graph<N, E>, Option<EdgeIndex>, NodeIndex),
+    F: FnMut(&Graph<N, E>, Option<EdgeIndex>, NodeIndex) -> R,
     E: std::cmp::PartialEq,
 {
     let mut queue = VecDeque::new();
     let mut visited = IndexSet::new();
+    let mut results = IndexMap::new();
     queue.push_back(start_node);
 
     if include_start {
-        node_action(graph, None, start_node);
+        let result = node_action(graph, None, start_node);
+        results.insert(start_node, result);
     }
 
     while let Some(node) = queue.pop_front() {
@@ -345,33 +346,36 @@ where
                 .collect();
 
             for (edge, neighbor) in neighbors {
-                node_action(graph, Some(edge), neighbor);
+                let result = node_action(graph, Some(edge), neighbor);
+                results.insert(neighbor, result);
                 if !visited.contains(&neighbor) {
                     queue.push_back(neighbor);
                 }
             }
         }
     }
-    visited
+    results
 }
 
-pub fn traverse_mut<'a, N, E, F>(
+pub fn traverse_mut<'a, N, E, F, R>(
     graph: &'a mut Graph<N, E>,
     filter_edge: Option<&'a [&'a E]>,
     start_node: NodeIndex,
     include_start: bool,
     mut node_action: F,
-) -> IndexSet<NodeIndex>
+) -> IndexMap<NodeIndex, R>
 where
-    F: FnMut(&mut Graph<N, E>, Option<EdgeIndex>, NodeIndex),
+    F: FnMut(&mut Graph<N, E>, Option<EdgeIndex>, NodeIndex) -> R,
     E: std::cmp::PartialEq,
 {
     let mut queue = VecDeque::new();
     let mut visited = IndexSet::new();
+    let mut results = IndexMap::new();
     queue.push_back(start_node);
 
     if include_start {
-        node_action(graph, None, start_node);
+        let result = node_action(graph, None, start_node);
+        results.insert(start_node, result);
     }
 
     while let Some(node) = queue.pop_front() {
@@ -393,12 +397,13 @@ where
                 .collect();
 
             for (edge, neighbor) in neighbors {
-                node_action(graph, Some(edge), neighbor);
+                let result = node_action(graph, Some(edge), neighbor);
+                results.insert(neighbor, result);
                 if !visited.contains(&neighbor) {
                     queue.push_back(neighbor);
                 }
             }
         }
     }
-    visited
+    results
 }
