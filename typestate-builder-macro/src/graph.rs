@@ -322,21 +322,23 @@ where
     let mut visited = IndexSet::new(); // Track visited nodes
 
     queue.push_back(start); // Start from the initial node
-    visited.insert(start); // Mark the starting node as visited
 
     while let Some(node) = queue.pop_front() {
-        // Iterate over neighbors of the current node
-        for neighbor in graph.neighbors(node) {
-            if !visited.contains(&neighbor) {
-                // Find the edge between the current node and the neighbor
-                if let Some(edge) = graph.find_edge(node, neighbor) {
-                    if &graph[edge] == edge_type {
-                        // Call the mutable closure with the graph, current node, and edge
-                        node_action(graph, node, edge);
+        // Mark the current node as visited
+        if visited.insert(node) {
+            // Iterate over neighbors of the current node
+            for neighbor in graph.neighbors(node) {
+                if !visited.contains(&neighbor) {
+                    // Find the edge between the current node and the neighbor
+                    if let Some(edge) = graph.find_edge(node, neighbor) {
+                        if &graph[edge] == edge_type {
+                            // Call the mutable closure with the graph, current node, and edge
+                            node_action(graph, node, edge);
 
-                        // Push the neighbor to the queue and mark as visited
-                        queue.push_back(neighbor);
-                        visited.insert(neighbor);
+                            // Push the neighbor to the queue and mark as visited
+                            queue.push_back(neighbor);
+                            visited.insert(neighbor);
+                        }
                     }
                 }
             }
