@@ -23,15 +23,11 @@ use crate::{
     helper::extract_ident,
 };
 
-pub fn run(
-    graph: StructGraph,
-    map: IndexMap<String, NodeIndex>,
-) -> (StructGraph, IndexMap<String, NodeIndex>) {
-    let graph = bind_field_elements(graph, &map);
-    (graph, map)
+pub fn run(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex>) {
+    bind_field_elements(graph, map);
 }
 
-fn bind_field_elements(mut graph: StructGraph, map: &IndexMap<String, NodeIndex>) -> StructGraph {
+fn bind_field_elements(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex>) {
     if let Some(start) = map.get(FIELD_START_P) {
         let action = |graph: &mut StructGraph, _edge, node_field| {
             list_field_assets(graph, node_field);
@@ -39,14 +35,13 @@ fn bind_field_elements(mut graph: StructGraph, map: &IndexMap<String, NodeIndex>
             traversal_in_where_clause(graph, node_field, map);
         };
         traverse_mut(
-            &mut graph,
+            graph,
             Some(&[&StructRelation::FieldTrain]),
             *start,
             true,
             action,
         );
     }
-    graph
 }
 
 const ONLY_FIELD_MSG: &str = "Only Field is accepted.";
