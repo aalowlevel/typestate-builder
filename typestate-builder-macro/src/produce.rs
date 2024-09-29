@@ -41,18 +41,18 @@ impl<'a> BuilderStatePair<'a> {
                 let StructElement::Field(field) = &graph[node] else {
                     return;
                 };
-                let builder_state_pair = BuilderStatePair::new(&field.syn);
+                let builder_state_pair = BuilderStatePair::new(&field.syn, field.nth);
             };
             let visited = traverse_by_edge(&graph, &StructRelation::FieldTrain, *start, action);
         }
         (graph, map)
     }
 
-    fn new(field: &'a syn::Field) -> Self {
+    fn new(field: &'a syn::Field, nth: usize) -> Self {
         let ident = if let Some(ident) = &field.ident {
             Cow::Borrowed(ident)
         } else {
-            Cow::Owned(Ident::new("field", Span::call_site()))
+            Cow::Owned(Ident::new(&format!("field{}", nth), Span::call_site()))
         };
         Self { ident }
     }

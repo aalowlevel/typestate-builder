@@ -115,6 +115,7 @@ impl Serialize for Field {
         S: serde::Serializer,
     {
         let mut res = serializer.serialize_struct("Field", 1)?;
+        res.serialize_field("nth", &self.nth)?;
         res.skip_field("syn")?;
         res.end()
     }
@@ -284,6 +285,7 @@ impl Serialize for GenericParam {
         S: serde::Serializer,
     {
         let mut res = serializer.serialize_struct("GenericParam", 1)?;
+        res.serialize_field("nth", &self.nth)?;
         res.skip_field("syn")?;
         res.end()
     }
@@ -300,6 +302,7 @@ impl Serialize for WherePredicate {
         S: serde::Serializer,
     {
         let mut res = serializer.serialize_struct("WherePredicate", 1)?;
+        res.serialize_field("nth", &self.nth)?;
         res.skip_field("syn")?;
         res.end()
     }
