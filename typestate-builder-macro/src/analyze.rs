@@ -11,8 +11,7 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use std::collections::{HashMap, HashSet};
-
+use indexmap::IndexMap;
 use petgraph::{graph::NodeIndex, visit::Dfs};
 use proc_macro_error::emit_call_site_warning;
 use syn::{GenericParam, WherePredicate};
@@ -24,30 +23,34 @@ use crate::{
 
 pub fn run(
     graph: StructGraph,
-    map: HashMap<String, NodeIndex>,
-) -> (StructGraph, HashMap<String, NodeIndex>) {
+    map: IndexMap<String, NodeIndex>,
+) -> (StructGraph, IndexMap<String, NodeIndex>) {
     let graph = bind_field_elements(graph, &map);
     (graph, map)
 }
 
-fn bind_field_elements(mut graph: StructGraph, map: &HashMap<String, NodeIndex>) -> StructGraph {
+fn bind_field_elements(mut graph: StructGraph, map: &IndexMap<String, NodeIndex>) -> StructGraph {
     if let Some(start) = map.get("Field0") {
-        // Define a mutating closure that increments the node index
-        let mutate_node = |graph: &mut StructGraph, node: NodeIndex, edge| {
-            let node = &mut graph[node];
+        let action = |graph: &mut StructGraph, node, _edge| {
+            list_field_assets(graph, node);
+            // traversal_in_generics(graph, node, map);
+            // traversal_in_where_clause(graph, node, map);
         };
+        let visited = traverse_by_edge_mut(&mut graph, &StructRelation::FieldTrain, *start, action);
 
-        let visited =
-            traverse_by_edge_mut(&mut graph, &StructRelation::FieldTrain, *start, mutate_node);
-        emit_call_site_warning!(format!("{:?}", visited));
-    }
-    if let Some(mut dfs) = map.get("Field0").map(|start| Dfs::new(&graph, *start)) {
-        // Traversal on field train.
-        while let Some(node_field) = dfs.next(&graph) {
-            list_field_assets(&mut graph, node_field);
-            traversal_in_generics(&mut graph, node_field, map);
-            traversal_in_where_clause(&mut graph, node_field, map);
-        }
+        let visited = visited
+            .into_iter()
+            .filter_map(|f| {
+                let node = &graph[f];
+                if let StructElement::Field(field) = node {
+                    if let Some(ident) = &field.syn.ident {
+                        return Some(ident.to_string());
+                    }
+                }
+                None
+            })
+            .collect::<Vec<_>>();
+        emit_call_site_warning!(visited.join(", "));
     }
     graph
 }
@@ -64,7 +67,7 @@ fn list_field_assets(graph: &mut StructGraph, node_field: NodeIndex) {
 fn traversal_in_generics(
     graph: &mut StructGraph,
     node_field: NodeIndex,
-    map: &HashMap<String, NodeIndex>,
+    map: &IndexMap<String, NodeIndex>,
 ) {
     if let Some(mut dfs) = map.get("Generic0").map(|start| Dfs::new(&*graph, *start)) {
         // Traversal on generic train.
@@ -109,7 +112,7 @@ fn search_in_generics(graph: &mut StructGraph, node_field: NodeIndex, node_gener
 fn traversal_in_where_clause(
     graph: &mut StructGraph,
     node_field: NodeIndex,
-    map: &HashMap<String, NodeIndex>,
+    map: &IndexMap<String, NodeIndex>,
 ) {
     if let Some(mut dfs) = map
         .get("WherePredicate0")

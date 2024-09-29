@@ -11,8 +11,9 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 
+use indexmap::IndexSet;
 use petgraph::{
     graph::{EdgeIndex, NodeIndex},
     Graph,
@@ -104,9 +105,9 @@ pub type StructGraph = Graph<StructElement, StructRelation>;
 #[derive(Debug)]
 pub struct Field {
     pub syn: syn::Field,
-    pub idents: HashSet<Ident>,
-    pub lifetimes: HashSet<Lifetime>,
-    pub const_params: HashSet<Ident>,
+    pub idents: IndexSet<Ident>,
+    pub lifetimes: IndexSet<Lifetime>,
+    pub const_params: IndexSet<Ident>,
 }
 
 impl Serialize for Field {
@@ -132,9 +133,9 @@ impl Field {
 
     fn list_type(
         ty: &Type,
-        idents: &mut HashSet<Ident>,
-        lifetimes: &mut HashSet<Lifetime>,
-        const_params: &mut HashSet<Ident>,
+        idents: &mut IndexSet<Ident>,
+        lifetimes: &mut IndexSet<Lifetime>,
+        const_params: &mut IndexSet<Ident>,
     ) {
         match ty {
             Type::Array(TypeArray { elem, len, .. }) => {
@@ -197,9 +198,9 @@ impl Field {
 
     fn handle_path(
         path: &syn::Path,
-        idents: &mut HashSet<Ident>,
-        lifetimes: &mut HashSet<Lifetime>,
-        const_params: &mut HashSet<Ident>,
+        idents: &mut IndexSet<Ident>,
+        lifetimes: &mut IndexSet<Lifetime>,
+        const_params: &mut IndexSet<Ident>,
     ) {
         for segment in &path.segments {
             idents.insert(segment.ident.clone());
@@ -224,9 +225,9 @@ impl Field {
 
     fn handle_generic_argument(
         arg: &GenericArgument,
-        idents: &mut HashSet<Ident>,
-        lifetimes: &mut HashSet<Lifetime>,
-        const_params: &mut HashSet<Ident>,
+        idents: &mut IndexSet<Ident>,
+        lifetimes: &mut IndexSet<Lifetime>,
+        const_params: &mut IndexSet<Ident>,
     ) {
         match arg {
             GenericArgument::Type(ty) => Self::list_type(ty, idents, lifetimes, const_params),
@@ -244,7 +245,7 @@ impl Field {
         }
     }
 
-    fn handle_const_expr(expr: &Expr, const_params: &mut HashSet<Ident>) {
+    fn handle_const_expr(expr: &Expr, const_params: &mut IndexSet<Ident>) {
         if let Expr::Path(ExprPath { path, .. }) = expr {
             if path.segments.len() == 1 {
                 // Single segment path is likely a const generic parameter
@@ -257,9 +258,9 @@ impl Field {
 
     fn handle_type_param_bound(
         bound: &syn::TypeParamBound,
-        idents: &mut HashSet<Ident>,
-        lifetimes: &mut HashSet<Lifetime>,
-        const_params: &mut HashSet<Ident>,
+        idents: &mut IndexSet<Ident>,
+        lifetimes: &mut IndexSet<Lifetime>,
+        const_params: &mut IndexSet<Ident>,
     ) {
         match bound {
             syn::TypeParamBound::Trait(trait_bound) => {
@@ -278,11 +279,12 @@ pub fn traverse_by_edge<'a, F>(
     edge_type: &'a StructRelation,
     start: NodeIndex,
     mut node_action: F,
-) where
+) -> IndexSet<NodeIndex>
+where
     F: FnMut(NodeIndex),
 {
     let mut queue = VecDeque::new();
-    let mut visited = HashSet::new();
+    let mut visited = IndexSet::new();
 
     queue.push_back(start);
     visited.insert(start);
@@ -301,19 +303,20 @@ pub fn traverse_by_edge<'a, F>(
             }
         }
     }
+    visited
 }
 pub fn traverse_by_edge_mut<'a, F>(
     graph: &'a mut StructGraph,    // Mutable reference to the graph
     edge_type: &'a StructRelation, // Edge type to filter on
     start_node: NodeIndex,         // Starting node
     mut node_action: F,            // Closure to mutate nodes and edges
-) -> HashSet<NodeIndex>
+) -> IndexSet<NodeIndex>
 // Return the visited nodes
 where
     F: FnMut(&mut StructGraph, NodeIndex, EdgeIndex), // Mutating closure
 {
     let mut stack = VecDeque::new(); // Stack to keep track of nodes to visit
-    let mut visited = HashSet::new(); // Set to track visited nodes
+    let mut visited = IndexSet::new(); // Set to track visited nodes
     stack.push_back(start_node); // Start from the initial node
 
     while let Some(node) = stack.pop_back() {
@@ -344,6 +347,5 @@ where
             }
         }
     }
-
     visited // Return the visited nodes
 }

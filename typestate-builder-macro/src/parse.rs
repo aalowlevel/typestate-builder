@@ -16,8 +16,7 @@ use crate::{
     StructElement, StructRelation,
 };
 
-use std::collections::{HashMap, HashSet};
-
+use indexmap::{IndexMap, IndexSet};
 use petgraph::{graph::NodeIndex, Graph};
 use syn::{Data, DeriveInput, Fields};
 
@@ -37,13 +36,13 @@ macro_rules! add_from_syn_list {
     }};
 }
 
-pub fn run(input: DeriveInput) -> (StructGraph, HashMap<String, NodeIndex>) {
+pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
     let Data::Struct(data_struct) = input.data else {
         panic!("TypestateBuilder only supports structs");
     };
 
     let mut graph = Graph::<StructElement, StructRelation>::new();
-    let mut map = HashMap::new();
+    let mut map = IndexMap::new();
 
     // Beginning
     {
@@ -72,9 +71,9 @@ pub fn run(input: DeriveInput) -> (StructGraph, HashMap<String, NodeIndex>) {
                 .into_iter()
                 .map(|f| Field {
                     syn: f,
-                    idents: HashSet::new(),
-                    lifetimes: HashSet::new(),
-                    const_params: HashSet::new(),
+                    idents: IndexSet::new(),
+                    lifetimes: IndexSet::new(),
+                    const_params: IndexSet::new(),
                 })
                 .collect::<Vec<_>>();
             add_from_syn_list!(graph, map, fields, Field, FieldTrain);
@@ -85,9 +84,9 @@ pub fn run(input: DeriveInput) -> (StructGraph, HashMap<String, NodeIndex>) {
                 .into_iter()
                 .map(|f| Field {
                     syn: f,
-                    idents: HashSet::new(),
-                    lifetimes: HashSet::new(),
-                    const_params: HashSet::new(),
+                    idents: IndexSet::new(),
+                    lifetimes: IndexSet::new(),
+                    const_params: IndexSet::new(),
                 })
                 .collect::<Vec<_>>();
             add_from_syn_list!(graph, map, fields, Field, FieldTrain);
