@@ -14,28 +14,7 @@
 //! This crate provides the `TypestateBuilder` derive macro for generating a
 //! typestate-pattern builder for structs.
 //!
-//! # Typestate Pattern
-//! The typestate pattern helps ensure that a struct is initialized in steps,
-//! enforcing that certain fields must be set before others. This prevents
-//! the creation of incomplete structs and provides compile-time safety for
-//! field initialization.
-//!
-//! Example usage:
-//!
-//! ```rust
-//! #[derive(TypestateBuilder)]
-//! struct Person {
-//!     name: String,
-//!     age: u32,
-//!     email: Option<String>,
-//! }
-//!
-//! let person = Person::builder()
-//!     .name("Alice".to_string())
-//!     .age(30)
-//!     .email(Some("alice@example.com".to_string()))
-//!     .build();
-//! ```
+//! This is the helper crate of [typestate-builder](https://docs.rs/typestate-builder/latest/typestate_builder/).
 
 #![warn(missing_docs)]
 
