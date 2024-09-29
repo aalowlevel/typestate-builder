@@ -275,27 +275,32 @@ impl Field {
 }
 
 pub fn traverse_by_edge<'a, F>(
-    graph: &'a StructGraph,
-    edge_type: &'a StructRelation,
-    start: NodeIndex,
-    mut node_action: F,
+    graph: &'a StructGraph,        // Immutable reference to the graph
+    edge_type: &'a StructRelation, // Edge type to filter on
+    start: NodeIndex,              // Starting node index
+    mut node_action: F,            // Closure that can mutate captured environment
 ) -> IndexSet<NodeIndex>
+// Return visited nodes
 where
-    F: FnMut(NodeIndex),
+    F: FnMut(&StructGraph, NodeIndex, EdgeIndex), // Closure that can mutate environment
 {
-    let mut queue = VecDeque::new();
-    let mut visited = IndexSet::new();
+    let mut queue = VecDeque::new(); // Queue for BFS traversal
+    let mut visited = IndexSet::new(); // Track visited nodes
 
-    queue.push_back(start);
-    visited.insert(start);
+    queue.push_back(start); // Start from the initial node
+    visited.insert(start); // Mark the starting node as visited
 
     while let Some(node) = queue.pop_front() {
-        node_action(node);
-
+        // Iterate over neighbors of the current node
         for neighbor in graph.neighbors(node) {
             if !visited.contains(&neighbor) {
+                // Find the edge between the current node and the neighbor
                 if let Some(edge) = graph.find_edge(node, neighbor) {
                     if &graph[edge] == edge_type {
+                        // Call the mutable closure with the graph, current node, and edge
+                        node_action(graph, node, edge);
+
+                        // Push the neighbor to the queue and mark as visited
                         queue.push_back(neighbor);
                         visited.insert(neighbor);
                     }
@@ -303,8 +308,10 @@ where
             }
         }
     }
-    visited
+
+    visited // Return the visited nodes
 }
+
 pub fn traverse_by_edge_mut<'a, F>(
     graph: &'a mut StructGraph,    // Mutable reference to the graph
     edge_type: &'a StructRelation, // Edge type to filter on
