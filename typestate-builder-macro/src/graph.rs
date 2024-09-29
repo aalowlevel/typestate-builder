@@ -13,7 +13,10 @@
 
 use std::collections::{HashSet, VecDeque};
 
-use petgraph::{graph::NodeIndex, Graph};
+use petgraph::{
+    graph::{EdgeIndex, NodeIndex},
+    Graph,
+};
 use serde::{ser::SerializeStruct, Serialize};
 use syn::{
     Attribute, Expr, ExprPath, GenericArgument, GenericParam, Ident, Lifetime, PathArguments, Type,
@@ -270,7 +273,7 @@ impl Field {
     }
 }
 
-pub fn traverse<'a, F>(
+pub fn traverse_by_edge<'a, F>(
     graph: &'a StructGraph,
     edge_type: &'a StructRelation,
     start: NodeIndex,
@@ -298,4 +301,49 @@ pub fn traverse<'a, F>(
             }
         }
     }
+}
+pub fn traverse_by_edge_mut<'a, F>(
+    graph: &'a mut StructGraph,    // Mutable reference to the graph
+    edge_type: &'a StructRelation, // Edge type to filter on
+    start_node: NodeIndex,         // Starting node
+    mut node_action: F,            // Closure to mutate nodes and edges
+) -> HashSet<NodeIndex>
+// Return the visited nodes
+where
+    F: FnMut(&mut StructGraph, NodeIndex, EdgeIndex), // Mutating closure
+{
+    let mut stack = VecDeque::new(); // Stack to keep track of nodes to visit
+    let mut visited = HashSet::new(); // Set to track visited nodes
+    stack.push_back(start_node); // Start from the initial node
+
+    while let Some(node) = stack.pop_back() {
+        // Mark the current node as visited
+        if visited.insert(node) {
+            // Insert returns false if already visited
+            // Step 1: Collect neighbors and edges that match the edge type
+            let neighbors: Vec<(NodeIndex, EdgeIndex)> = graph
+                .neighbors(node)
+                .filter_map(|neighbor| {
+                    // Find the edge between the current node and the neighbor
+                    if let Some(edge) = graph.find_edge(node, neighbor) {
+                        if &graph[edge] == edge_type {
+                            // Collect the neighbor and edge if it matches the edge type
+                            return Some((neighbor, edge));
+                        }
+                    }
+                    None
+                })
+                .collect(); // Collect them into a vector
+
+            // Step 2: Apply mutations
+            for (neighbor, edge) in neighbors {
+                // Mutate the current node and edge
+                node_action(graph, node, edge);
+                // Push the neighbor onto the stack for later visiting
+                stack.push_back(neighbor);
+            }
+        }
+    }
+
+    visited // Return the visited nodes
 }

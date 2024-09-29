@@ -11,13 +11,14 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use petgraph::{graph::NodeIndex, visit::Dfs};
+use proc_macro_error::emit_call_site_warning;
 use syn::{GenericParam, WherePredicate};
 
 use crate::{
-    graph::{traverse, StructElement, StructGraph, StructRelation},
+    graph::{traverse_by_edge_mut, StructElement, StructGraph, StructRelation},
     helper::extract_ident,
 };
 
@@ -30,6 +31,16 @@ pub fn run(
 }
 
 fn bind_field_elements(mut graph: StructGraph, map: &HashMap<String, NodeIndex>) -> StructGraph {
+    if let Some(start) = map.get("Field0") {
+        // Define a mutating closure that increments the node index
+        let mutate_node = |graph: &mut StructGraph, node: NodeIndex, edge| {
+            let node = &mut graph[node];
+        };
+
+        let visited =
+            traverse_by_edge_mut(&mut graph, &StructRelation::FieldTrain, *start, mutate_node);
+        emit_call_site_warning!(format!("{:?}", visited));
+    }
     if let Some(mut dfs) = map.get("Field0").map(|start| Dfs::new(&graph, *start)) {
         // Traversal on field train.
         while let Some(node_field) = dfs.next(&graph) {
@@ -38,16 +49,12 @@ fn bind_field_elements(mut graph: StructGraph, map: &HashMap<String, NodeIndex>)
             traversal_in_where_clause(&mut graph, node_field, map);
         }
     }
-    if let Some(start) = map.get("Field0") {
-        let node_action = |node| {};
-        traverse(&graph, &StructRelation::FieldTrain, *start, node_action);
-    }
     graph
 }
 
 const ONLY_FIELD_MSG: &str = "Only Field is accepted.";
 const ONLY_GENERIC_MSG: &str = "Only Generic is accepted.";
-const ONLY_WP_MSG: &str = "Only Where Predicate is accepte  d.";
+const ONLY_WP_MSG: &str = "Only Where Predicate is accepted.";
 fn list_field_assets(graph: &mut StructGraph, node_field: NodeIndex) {
     let StructElement::Field(field) = &mut graph[node_field] else {
         panic!("{}", ONLY_FIELD_MSG);
