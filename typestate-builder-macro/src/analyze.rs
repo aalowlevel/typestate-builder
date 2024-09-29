@@ -70,7 +70,7 @@ fn search_in_generics(graph: &mut StructGraph, node_field: NodeIndex, node_gener
     let StructElement::Generic(generic) = &graph[node_generic] else {
         panic!("{}", ONLY_GENERIC_MSG);
     };
-    let generic_ident = match generic {
+    let generic_ident = match &generic.syn {
         GenericParam::Lifetime(lifetime_param) => &lifetime_param.lifetime.ident,
         GenericParam::Type(type_param) => &type_param.ident,
         GenericParam::Const(const_param) => &const_param.ident,
@@ -117,7 +117,7 @@ fn search_in_wp(graph: &mut StructGraph, node_field: NodeIndex, node_wp: NodeInd
     let StructElement::WherePredicate(wp) = &graph[node_wp] else {
         panic!("{}", ONLY_WP_MSG);
     };
-    let wp_ident = match wp {
+    let wp_ident = match &wp.syn {
         WherePredicate::Lifetime(predicate_lifetime) => Some(&predicate_lifetime.lifetime.ident),
         WherePredicate::Type(predicate_type) => extract_ident(&predicate_type.bounded_ty),
         _ => None,

@@ -19,11 +19,11 @@ use petgraph::{
     Graph,
 };
 use serde::{ser::SerializeStruct, Serialize};
+use serde_json::json;
 use syn::{
-    Attribute, Expr, ExprPath, GenericArgument, GenericParam, Ident, Lifetime, PathArguments, Type,
-    TypeArray, Visibility, WherePredicate,
+    Attribute, Expr, ExprPath, GenericArgument, Ident, Lifetime, PathArguments, Type, TypeArray,
+    Visibility,
 };
-use syn_serde::Syn;
 
 pub const FIELD_START_P: &str = "Field0";
 pub const GENERICS_START_P: &str = "Generic0";
@@ -44,42 +44,36 @@ impl Serialize for StructElement {
         S: serde::Serializer,
     {
         match self {
-            StructElement::Visibility(visibility) => serializer.serialize_newtype_variant(
+            StructElement::Visibility(_visibility) => serializer.serialize_newtype_variant(
                 "StructElement",
                 0,
                 "Visibility",
-                &visibility.to_adapter(),
+                &json!("Visibility"),
             ),
-            StructElement::Ident(ident) => serializer.serialize_newtype_variant(
-                "StructElement",
-                0,
-                "Ident",
-                &ident.to_adapter(),
-            ),
-            StructElement::Attribute(attribute) => serializer.serialize_newtype_variant(
+            StructElement::Ident(_ident) => {
+                serializer.serialize_newtype_variant("StructElement", 0, "Ident", &json!("Ident"))
+            }
+            StructElement::Attribute(_attribute) => serializer.serialize_newtype_variant(
                 "StructElement",
                 0,
                 "Attribute",
-                &attribute.to_adapter(),
+                &json!("Attribute"),
             ),
             StructElement::Generic(generic_param) => serializer.serialize_newtype_variant(
                 "StructElement",
                 0,
                 "GenericParam",
-                &generic_param.to_adapter(),
+                &generic_param,
             ),
             StructElement::WherePredicate(where_predicate) => serializer.serialize_newtype_variant(
                 "StructElement",
                 0,
                 "WherePredicate",
-                &where_predicate.to_adapter(),
+                &where_predicate,
             ),
-            StructElement::Field(field) => serializer.serialize_newtype_variant(
-                "StructElement",
-                0,
-                "Field",
-                &field.syn.to_adapter(),
-            ),
+            StructElement::Field(field) => {
+                serializer.serialize_newtype_variant("StructElement", 0, "Field", &field)
+            }
         }
     }
 }
@@ -108,6 +102,7 @@ pub type StructGraph = Graph<StructElement, StructRelation>;
 
 #[derive(Debug)]
 pub struct Field {
+    pub nth: usize,
     pub syn: syn::Field,
     pub idents: IndexSet<Ident>,
     pub lifetimes: IndexSet<Lifetime>,
@@ -120,7 +115,7 @@ impl Serialize for Field {
         S: serde::Serializer,
     {
         let mut res = serializer.serialize_struct("Field", 1)?;
-        res.serialize_field("syn", &self.syn.to_adapter())?;
+        res.skip_field("syn")?;
         res.end()
     }
 }
@@ -275,6 +270,38 @@ impl Field {
             }
             _ => {}
         }
+    }
+}
+
+pub struct GenericParam {
+    pub nth: usize,
+    pub syn: syn::GenericParam,
+}
+
+impl Serialize for GenericParam {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut res = serializer.serialize_struct("GenericParam", 1)?;
+        res.skip_field("syn")?;
+        res.end()
+    }
+}
+
+pub struct WherePredicate {
+    pub nth: usize,
+    pub syn: syn::WherePredicate,
+}
+
+impl Serialize for WherePredicate {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut res = serializer.serialize_struct("WherePredicate", 1)?;
+        res.skip_field("syn")?;
+        res.end()
     }
 }
 
