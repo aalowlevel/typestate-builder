@@ -18,6 +18,7 @@ use petgraph::{
     graph::{EdgeIndex, NodeIndex},
     Graph,
 };
+use quote::ToTokens;
 use serde::{ser::SerializeStruct, Serialize};
 use serde_json::json;
 use syn::{
@@ -113,8 +114,15 @@ impl Serialize for Field {
     where
         S: serde::Serializer,
     {
-        let mut res = serializer.serialize_struct("Field", 1)?;
+        let mut res = serializer.serialize_struct("Field", 3)?;
+        let ident = if let Some(ident) = &self.syn.ident {
+            ident.to_string()
+        } else {
+            format!("field{}", self.nth)
+        };
         res.serialize_field("nth", &self.nth)?;
+        res.serialize_field("f", &ident)?;
+        res.serialize_field("ty", &self.syn.ty.to_token_stream().to_string())?;
         res.skip_field("syn")?;
         res.end()
     }
@@ -283,8 +291,9 @@ impl Serialize for GenericParam {
     where
         S: serde::Serializer,
     {
-        let mut res = serializer.serialize_struct("GenericParam", 1)?;
+        let mut res = serializer.serialize_struct("GenericParam", 2)?;
         res.serialize_field("nth", &self.nth)?;
+        res.serialize_field("ty", &self.syn.to_token_stream().to_string())?;
         res.skip_field("syn")?;
         res.end()
     }
