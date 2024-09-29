@@ -11,9 +11,9 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 
-use petgraph::Graph;
+use petgraph::{graph::NodeIndex, Graph};
 use serde::{ser::SerializeStruct, Serialize};
 use syn::{
     Attribute, Expr, ExprPath, GenericArgument, GenericParam, Ident, Lifetime, PathArguments, Type,
@@ -266,6 +266,36 @@ impl Field {
                 lifetimes.insert(lt.clone());
             }
             _ => {}
+        }
+    }
+}
+
+pub fn traverse<'a, F>(
+    graph: &'a StructGraph,
+    edge_type: &'a StructRelation,
+    start: NodeIndex,
+    mut node_action: F,
+) where
+    F: FnMut(NodeIndex),
+{
+    let mut queue = VecDeque::new();
+    let mut visited = HashSet::new();
+
+    queue.push_back(start);
+    visited.insert(start);
+
+    while let Some(node) = queue.pop_front() {
+        node_action(node);
+
+        for neighbor in graph.neighbors(node) {
+            if !visited.contains(&neighbor) {
+                if let Some(edge) = graph.find_edge(node, neighbor) {
+                    if &graph[edge] == edge_type {
+                        queue.push_back(neighbor);
+                        visited.insert(neighbor);
+                    }
+                }
+            }
         }
     }
 }

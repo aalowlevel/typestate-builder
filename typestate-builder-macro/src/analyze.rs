@@ -11,13 +11,13 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashMap;
 
-use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
+use petgraph::{graph::NodeIndex, visit::Dfs};
 use syn::{GenericParam, WherePredicate};
 
 use crate::{
-    graph::{StructElement, StructGraph, StructRelation},
+    graph::{traverse, StructElement, StructGraph, StructRelation},
     helper::extract_ident,
 };
 
@@ -38,12 +38,16 @@ fn bind_field_elements(mut graph: StructGraph, map: &HashMap<String, NodeIndex>)
             traversal_in_where_clause(&mut graph, node_field, map);
         }
     }
+    if let Some(start) = map.get("Field0") {
+        let node_action = |node| {};
+        traverse(&graph, &StructRelation::FieldTrain, *start, node_action);
+    }
     graph
 }
 
 const ONLY_FIELD_MSG: &str = "Only Field is accepted.";
 const ONLY_GENERIC_MSG: &str = "Only Generic is accepted.";
-const ONLY_WP_MSG: &str = "Only Where Predicate is accepted.";
+const ONLY_WP_MSG: &str = "Only Where Predicate is accepte  d.";
 fn list_field_assets(graph: &mut StructGraph, node_field: NodeIndex) {
     let StructElement::Field(field) = &mut graph[node_field] else {
         panic!("{}", ONLY_FIELD_MSG);
@@ -141,28 +145,5 @@ fn search_in_wp(graph: &mut StructGraph, node_field: NodeIndex, node_wp: NodeInd
             node_wp,
             StructRelation::FieldGenericsInWhereClause,
         );
-    }
-}
-
-fn traverse(graph: &StructGraph, edge_type: &StructRelation, start: NodeIndex) {
-    let mut queue = VecDeque::new();
-    let mut visited = HashSet::new();
-
-    queue.push_back(start);
-    visited.insert(start);
-
-    while let Some(node) = queue.pop_front() {
-        println!("Visiting node: {:?}", graph[node]);
-
-        for neighbor in graph.neighbors(node) {
-            if !visited.contains(&neighbor) {
-                if let Some(edge) = graph.find_edge(node, neighbor) {
-                    if &graph[edge] == edge_type {
-                        queue.push_back(neighbor);
-                        visited.insert(neighbor);
-                    }
-                }
-            }
-        }
     }
 }
