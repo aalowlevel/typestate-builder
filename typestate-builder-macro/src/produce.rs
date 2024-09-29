@@ -39,7 +39,7 @@ impl<'a> BuilderStatePair<'a> {
         graph: StructGraph,
         map: IndexMap<String, NodeIndex>,
     ) -> (StructGraph, IndexMap<String, NodeIndex>) {
-        let action = |graph: &StructGraph, node, _edge| {
+        let action = |graph: &StructGraph, _edge, node| {
             let StructElement::Field(field) = &graph[node] else {
                 return;
             };
@@ -58,7 +58,7 @@ impl<'a> BuilderStatePair<'a> {
             };
 
             let builder_state_pair = BuilderStatePair { main_ident, ident };
-            emit_call_site_warning!(format!("{:?}", builder_state_pair));
+            // emit_call_site_warning!(format!("{:?}", builder_state_pair));
         };
 
         if let Some(start) = map.get(FIELD_START_P) {

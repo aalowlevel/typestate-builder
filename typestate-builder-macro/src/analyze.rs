@@ -33,7 +33,10 @@ pub fn run(
 
 fn bind_field_elements(mut graph: StructGraph, map: &IndexMap<String, NodeIndex>) -> StructGraph {
     if let Some(start) = map.get(FIELD_START_P) {
-        let action = |graph: &mut StructGraph, node_field, _edge| {
+        list_field_assets(&mut graph, *start);
+        traversal_in_generics(&mut graph, *start, map);
+        traversal_in_where_clause(&mut graph, *start, map);
+        let action = |graph: &mut StructGraph, _edge, node_field| {
             list_field_assets(graph, node_field);
             traversal_in_generics(graph, node_field, map);
             traversal_in_where_clause(graph, node_field, map);
@@ -59,7 +62,7 @@ fn traversal_in_generics(
 ) {
     if let Some(start) = map.get(GENERICS_START_P) {
         search_in_generics(graph, node_field, *start);
-        let action = |graph: &mut StructGraph, node_generic, _edge| {
+        let action = |graph: &mut StructGraph, _edge, node_generic| {
             search_in_generics(graph, node_field, node_generic);
         };
         traverse_by_edge_mut(graph, &StructRelation::GenericTrain, *start, action);
@@ -105,7 +108,7 @@ fn traversal_in_where_clause(
 ) {
     if let Some(start) = map.get(WHERE_PREDICATE_START_P) {
         search_in_wp(graph, node_field, *start);
-        let action = |graph: &mut StructGraph, node_wp, _edge| {
+        let action = |graph: &mut StructGraph, _edge, node_wp| {
             search_in_wp(graph, node_field, node_wp);
         };
 

@@ -314,30 +314,35 @@ pub fn traverse_by_edge<'a, F>(
     mut node_action: F,
 ) -> IndexSet<NodeIndex>
 where
-    F: FnMut(&StructGraph, NodeIndex, EdgeIndex),
+    F: FnMut(&StructGraph, EdgeIndex, NodeIndex),
 {
     let mut queue = VecDeque::new();
     let mut visited = IndexSet::new();
-
     queue.push_back(start);
-    visited.insert(start); // Mark start node as visited immediately
 
     while let Some(node) = queue.pop_front() {
-        for neighbor in graph.neighbors(node) {
-            if let Some(edge) = graph.find_edge(node, neighbor) {
-                if &graph[edge] == edge_type {
-                    // Call the closure with the graph, current node, and edge
-                    node_action(graph, node, edge);
+        if visited.insert(node) {
+            let neighbors: Vec<_> = graph
+                .neighbors(node)
+                .filter_map(|neighbor| {
+                    graph.find_edge(node, neighbor).and_then(|edge| {
+                        if &graph[edge] == edge_type {
+                            Some((edge, neighbor))
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect();
 
-                    if visited.insert(neighbor) {
-                        // Only push to queue if it wasn't already visited
-                        queue.push_back(neighbor);
-                    }
+            for (edge, neighbor) in neighbors {
+                node_action(graph, edge, neighbor);
+                if !visited.contains(&neighbor) {
+                    queue.push_back(neighbor);
                 }
             }
         }
     }
-
     visited
 }
 
@@ -348,20 +353,20 @@ pub fn traverse_by_edge_mut<'a, F>(
     mut node_action: F,
 ) -> IndexSet<NodeIndex>
 where
-    F: FnMut(&mut StructGraph, NodeIndex, EdgeIndex),
+    F: FnMut(&mut StructGraph, EdgeIndex, NodeIndex),
 {
-    let mut stack = VecDeque::new();
+    let mut queue = VecDeque::new();
     let mut visited = IndexSet::new();
-    stack.push_back(start_node);
+    queue.push_back(start_node);
 
-    while let Some(node) = stack.pop_front() {
+    while let Some(node) = queue.pop_front() {
         if visited.insert(node) {
-            let neighbors: Vec<(NodeIndex, EdgeIndex)> = graph
+            let neighbors: Vec<_> = graph
                 .neighbors(node)
                 .filter_map(|neighbor| {
                     graph.find_edge(node, neighbor).and_then(|edge| {
                         if &graph[edge] == edge_type {
-                            Some((neighbor, edge))
+                            Some((edge, neighbor))
                         } else {
                             None
                         }
@@ -369,10 +374,10 @@ where
                 })
                 .collect();
 
-            for (neighbor, edge) in neighbors {
-                node_action(graph, node, edge);
+            for (edge, neighbor) in neighbors {
+                node_action(graph, edge, neighbor);
                 if !visited.contains(&neighbor) {
-                    stack.push_back(neighbor);
+                    queue.push_back(neighbor);
                 }
             }
         }
