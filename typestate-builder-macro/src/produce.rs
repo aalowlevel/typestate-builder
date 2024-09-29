@@ -11,8 +11,6 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use std::borrow::Cow;
-
 use indexmap::IndexMap;
 use petgraph::graph::NodeIndex;
 use proc_macro2::Span;
@@ -24,53 +22,61 @@ pub fn run(
     graph: StructGraph,
     map: IndexMap<String, NodeIndex>,
 ) -> (StructGraph, IndexMap<String, NodeIndex>) {
-    let (graph, map) = BuilderStatePair::run(graph, map);
+    let (graph, map, builder_states) = BuilderStates::run(graph, map);
+    proc_macro_error::emit_call_site_warning!(format!("{:?}", builder_states));
     (graph, map)
 }
 
 #[derive(Debug)]
-struct BuilderStatePair<'a> {
-    main_ident: &'a Ident,
-    ident: Cow<'a, Ident>,
-}
-impl<'a> BuilderStatePair<'a> {
+struct BuilderStates(IndexMap<NodeIndex, BuilderStatePair>);
+
+impl BuilderStates {
     fn run(
         graph: StructGraph,
         map: IndexMap<String, NodeIndex>,
-    ) -> (StructGraph, IndexMap<String, NodeIndex>) {
-        let action = |graph: &StructGraph, _edge, node| {
+    ) -> (StructGraph, IndexMap<String, NodeIndex>, Self) {
+        let action = |graph: &StructGraph, _edge, node| -> BuilderStatePair {
             let StructElement::Field(field) = &graph[node] else {
-                return;
+                panic!("Node must be a field.");
             };
             let Some(StructElement::Ident(main_ident)) = map.get("Ident").map(|f| &graph[*f])
             else {
-                return;
+                panic!("Struct must have an ident.");
             };
 
             let ident = if let Some(ident) = &field.syn.ident {
-                Cow::Borrowed(ident)
+                ident.clone()
             } else {
-                Cow::Owned(Ident::new(
-                    &format!("field{}", field.nth),
-                    Span::call_site(),
-                ))
+                Ident::new(&format!("field{}", field.nth), Span::call_site())
             };
 
-            let builder_state_pair = BuilderStatePair { main_ident, ident };
+            BuilderStatePair {
+                main_ident: main_ident.clone(),
+                ident,
+            }
         };
 
         if let Some(start) = map.get(FIELD_START_P) {
-            traverse(
+            let visited = traverse(
                 &graph,
                 Some(&[&StructRelation::FieldTrain]),
                 *start,
                 true,
                 action,
             );
+            (graph, map, Self(visited))
+        } else {
+            (graph, map, Self(IndexMap::new()))
         }
-        (graph, map)
     }
 }
+
+#[derive(Debug)]
+struct BuilderStatePair {
+    main_ident: Ident,
+    ident: Ident,
+}
+
 struct Builder {}
 struct BuilderNewImpl {}
 struct BuilderImpl {}
