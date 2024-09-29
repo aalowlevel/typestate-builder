@@ -12,7 +12,7 @@
 // be dual licensed as above, without any additional terms or conditions.
 
 use indexmap::IndexMap;
-use petgraph::{graph::NodeIndex, visit::Dfs};
+use petgraph::graph::NodeIndex;
 use proc_macro_error::emit_call_site_warning;
 use syn::{GenericParam, WherePredicate};
 
@@ -33,24 +33,10 @@ fn bind_field_elements(mut graph: StructGraph, map: &IndexMap<String, NodeIndex>
     if let Some(start) = map.get("Field0") {
         let action = |graph: &mut StructGraph, node, _edge| {
             list_field_assets(graph, node);
-            // traversal_in_generics(graph, node, map);
-            // traversal_in_where_clause(graph, node, map);
+            traversal_in_generics(graph, node, map);
+            traversal_in_where_clause(graph, node, map);
         };
-        let visited = traverse_by_edge_mut(&mut graph, &StructRelation::FieldTrain, *start, action);
-
-        let visited = visited
-            .into_iter()
-            .filter_map(|f| {
-                let node = &graph[f];
-                if let StructElement::Field(field) = node {
-                    if let Some(ident) = &field.syn.ident {
-                        return Some(ident.to_string());
-                    }
-                }
-                None
-            })
-            .collect::<Vec<_>>();
-        emit_call_site_warning!(visited.join(", "));
+        traverse_by_edge_mut(&mut graph, &StructRelation::FieldTrain, *start, action);
     }
     graph
 }
@@ -69,11 +55,11 @@ fn traversal_in_generics(
     node_field: NodeIndex,
     map: &IndexMap<String, NodeIndex>,
 ) {
-    if let Some(mut dfs) = map.get("Generic0").map(|start| Dfs::new(&*graph, *start)) {
-        // Traversal on generic train.
-        while let Some(node_generic) = dfs.next(&*graph) {
+    if let Some(start) = map.get("Generic0") {
+        let action = |graph: &mut StructGraph, node_generic, _edge| {
             search_in_generics(graph, node_field, node_generic);
-        }
+        };
+        traverse_by_edge_mut(graph, &StructRelation::GenericTrain, *start, action);
     }
 }
 /** Checks whether any element in the field is defined in the generics. If it is defined, establishes a connection. */
@@ -114,14 +100,13 @@ fn traversal_in_where_clause(
     node_field: NodeIndex,
     map: &IndexMap<String, NodeIndex>,
 ) {
-    if let Some(mut dfs) = map
-        .get("WherePredicate0")
-        .map(|start| Dfs::new(&*graph, *start))
-    {
-        // Traversal on where predicate train.
-        while let Some(node_wp) = dfs.next(&*graph) {
+    if let Some(start) = map.get("WherePredicate0") {
+        let action = |graph: &mut StructGraph, node_wp, _edge| {
             search_in_wp(graph, node_field, node_wp);
-        }
+        };
+        let visited =
+            traverse_by_edge_mut(graph, &StructRelation::WherePredicateTrain, *start, action);
+        emit_call_site_warning!(format!("{:?}", visited));
     }
 }
 /** Checks whether any element in the field is defined in where clause of the generics. If it is defined, establishes a connection. */
