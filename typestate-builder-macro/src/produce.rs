@@ -16,6 +16,7 @@ use std::borrow::Cow;
 use indexmap::IndexMap;
 use petgraph::graph::NodeIndex;
 use proc_macro2::Span;
+use proc_macro_error::emit_call_site_warning;
 use syn::Ident;
 
 use crate::graph::{traverse_by_edge, StructElement, StructGraph, StructRelation, FIELD_START_P};
@@ -28,7 +29,9 @@ pub fn run(
     (graph, map)
 }
 
+#[derive(Debug)]
 struct BuilderStatePair<'a> {
+    main_ident: &'a Ident,
     ident: Cow<'a, Ident>,
 }
 impl<'a> BuilderStatePair<'a> {
@@ -36,25 +39,32 @@ impl<'a> BuilderStatePair<'a> {
         graph: StructGraph,
         map: IndexMap<String, NodeIndex>,
     ) -> (StructGraph, IndexMap<String, NodeIndex>) {
-        if let Some(start) = map.get(FIELD_START_P) {
-            let action = |graph: &StructGraph, node, edge| {
-                let StructElement::Field(field) = &graph[node] else {
-                    return;
-                };
-                let builder_state_pair = BuilderStatePair::new(&field.syn, field.nth);
+        let action = |graph: &StructGraph, node, _edge| {
+            let StructElement::Field(field) = &graph[node] else {
+                return;
             };
-            let visited = traverse_by_edge(&graph, &StructRelation::FieldTrain, *start, action);
+            let Some(StructElement::Ident(main_ident)) = map.get("Ident").map(|f| &graph[*f])
+            else {
+                return;
+            };
+
+            let ident = if let Some(ident) = &field.syn.ident {
+                Cow::Borrowed(ident)
+            } else {
+                Cow::Owned(Ident::new(
+                    &format!("field{}", field.nth),
+                    Span::call_site(),
+                ))
+            };
+
+            let builder_state_pair = BuilderStatePair { main_ident, ident };
+            emit_call_site_warning!(format!("{:?}", builder_state_pair));
+        };
+
+        if let Some(start) = map.get(FIELD_START_P) {
+            traverse_by_edge(&graph, &StructRelation::FieldTrain, *start, action);
         }
         (graph, map)
-    }
-
-    fn new(field: &'a syn::Field, nth: usize) -> Self {
-        let ident = if let Some(ident) = &field.ident {
-            Cow::Borrowed(ident)
-        } else {
-            Cow::Owned(Ident::new(&format!("field{}", nth), Span::call_site()))
-        };
-        Self { ident }
     }
 }
 struct Builder {}

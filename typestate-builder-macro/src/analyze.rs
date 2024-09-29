@@ -13,7 +13,6 @@
 
 use indexmap::IndexMap;
 use petgraph::graph::NodeIndex;
-use proc_macro_error::emit_call_site_warning;
 use syn::{GenericParam, WherePredicate};
 
 use crate::{
@@ -107,9 +106,8 @@ fn traversal_in_where_clause(
         let action = |graph: &mut StructGraph, node_wp, _edge| {
             search_in_wp(graph, node_field, node_wp);
         };
-        let visited =
-            traverse_by_edge_mut(graph, &StructRelation::WherePredicateTrain, *start, action);
-        emit_call_site_warning!(format!("{:?}", visited));
+
+        traverse_by_edge_mut(graph, &StructRelation::WherePredicateTrain, *start, action);
     }
 }
 /** Checks whether any element in the field is defined in where clause of the generics. If it is defined, establishes a connection. */
