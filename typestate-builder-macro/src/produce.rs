@@ -14,11 +14,13 @@
 use std::borrow::Cow;
 
 use indexmap::IndexMap;
+use petgraph::graph::EdgeIndex;
 use petgraph::graph::NodeIndex;
 use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::Ident;
+use syn::Type;
 
 use crate::graph::{traverse, StructElement, StructGraph, StructRelation, FIELD_START_P};
 
@@ -60,6 +62,8 @@ impl BuilderStates {
 struct BuilderStatePair<'a> {
     main_ident: &'a Ident,
     ident: Cow<'a, Ident>,
+    ty: &'a Type,
+    to_main_generics: IndexMap<NodeIndex, syn::GenericParam>,
 }
 
 impl<'a> BuilderStatePair<'a> {
@@ -82,7 +86,31 @@ impl<'a> BuilderStatePair<'a> {
                 Span::call_site(),
             ))
         };
-        Self { main_ident, ident }
+        let ty = &field.syn.ty;
+        let to_main_generics = traverse(
+            graph,
+            Some(&[&StructRelation::FieldGenericsInMain]),
+            field_node,
+            false,
+            Self::traverse_to_main_generics,
+        );
+        Self {
+            main_ident,
+            ident,
+            ty,
+            to_main_generics,
+        }
+    }
+
+    fn traverse_to_main_generics(
+        graph: &StructGraph,
+        _edge: Option<EdgeIndex>,
+        generic_node: NodeIndex,
+    ) -> syn::GenericParam {
+        let StructElement::Generic(generic) = &graph[generic_node] else {
+            panic!("Node must be a generic.");
+        };
+        generic.syn.clone()
     }
 }
 
