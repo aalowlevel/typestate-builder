@@ -72,7 +72,10 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
             .predicates
             .into_iter()
             .enumerate()
-            .map(|(nth, syn)| WherePredicate { nth, syn })
+            .map(|(nth, syn)| WherePredicate {
+                nth,
+                syn: Rc::new(syn),
+            })
             .collect::<Vec<_>>();
         add_from_list!(
             graph,

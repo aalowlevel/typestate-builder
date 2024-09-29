@@ -292,7 +292,7 @@ impl Serialize for GenericParam {
 
 pub struct WherePredicate {
     pub nth: usize,
-    pub syn: syn::WherePredicate,
+    pub syn: Rc<syn::WherePredicate>,
 }
 
 impl Serialize for WherePredicate {

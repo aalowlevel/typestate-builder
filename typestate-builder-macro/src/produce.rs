@@ -52,20 +52,24 @@ impl BuilderStates {
                 ident,
                 ty,
                 to_main_generics,
+                to_where_predicates,
             } = BuilderStatePair::new(graph, field_node, map);
             let ident_added = format_ident!("{}{}Added", main_ident, ident_to_titlecase(&ident));
             let ident_empty = format_ident!("{}{}Empty", main_ident, ident_to_titlecase(&ident));
-            let to_main_generics = to_main_generics
-                .into_iter()
-                .map(|(_k, v)| v)
-                .collect::<Vec<_>>();
+            let to_main_generics = to_main_generics.values().collect::<Vec<_>>();
             let generics = if to_main_generics.is_empty() {
                 quote! {}
             } else {
                 quote! { < #(#to_main_generics),* > }
             };
+            let to_where_predicates = to_where_predicates.values().collect::<Vec<_>>();
+            let where_clause = if to_where_predicates.is_empty() {
+                quote! {}
+            } else {
+                quote! { where #(#to_where_predicates),* }
+            };
             quote! {
-                struct #ident_added #generics(#ty);
+                struct #ident_added #generics(#ty) #where_clause;
                 struct #ident_empty;
             }
         };
@@ -87,6 +91,7 @@ struct BuilderStatePair<'a> {
     ident: Cow<'a, Ident>,
     ty: &'a Type,
     to_main_generics: IndexMap<NodeIndex, Rc<syn::GenericParam>>,
+    to_where_predicates: IndexMap<NodeIndex, Rc<syn::WherePredicate>>,
 }
 
 impl<'a> BuilderStatePair<'a> {
@@ -117,11 +122,19 @@ impl<'a> BuilderStatePair<'a> {
             false,
             Self::traverse_to_main_generics,
         );
+        let to_where_predicates = traverse(
+            graph,
+            Some(&[&StructRelation::FieldGenericsInWhereClause]),
+            field_node,
+            false,
+            Self::traverse_to_where_predicate,
+        );
         Self {
             main_ident,
             ident,
             ty,
             to_main_generics,
+            to_where_predicates,
         }
     }
 
@@ -134,6 +147,17 @@ impl<'a> BuilderStatePair<'a> {
             panic!("Node must be a generic.");
         };
         Rc::clone(&generic.syn)
+    }
+
+    fn traverse_to_where_predicate(
+        graph: &StructGraph,
+        _edge: Option<EdgeIndex>,
+        generic_node: NodeIndex,
+    ) -> Rc<syn::WherePredicate> {
+        let StructElement::WherePredicate(wp) = &graph[generic_node] else {
+            panic!("Node must be a Where Predicate.");
+        };
+        Rc::clone(&wp.syn)
     }
 }
 
