@@ -13,7 +13,6 @@
 
 use indexmap::IndexMap;
 use petgraph::graph::NodeIndex;
-use quote::quote;
 use syn::{GenericParam, WherePredicate};
 
 use crate::{
@@ -21,7 +20,7 @@ use crate::{
         traverse_mut, StructElement, StructGraph, StructRelation, FIELD_START_P, GENERICS_START_P,
         WHERE_PREDICATE_START_P,
     },
-    helper::extract_ident,
+    helper::{extract_ident, type_equals_type_param},
 };
 
 pub fn run(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex>) {
@@ -33,8 +32,8 @@ fn bind_field_elements(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex
     if let Some(start) = map.get(FIELD_START_P) {
         let action = |graph: &mut StructGraph, _edge, node_field| {
             list_field_assets(graph, node_field);
-            traversal_in_generics(graph, node_field, map);
-            traversal_in_where_clause(graph, node_field, map);
+            traversal_field_to_generics(graph, node_field, map);
+            traversal_field_to_where_clause(graph, node_field, map);
         };
         traverse_mut(
             graph,
@@ -50,6 +49,7 @@ fn bind_where_predicate_elements(graph: &mut StructGraph, map: &IndexMap<String,
     if let Some(start) = map.get(WHERE_PREDICATE_START_P) {
         let action = |graph: &mut StructGraph, _edge, node_wp| {
             list_wp_assets(graph, node_wp);
+            traversal_wp_to_generics(graph, node_wp, map);
         };
         traverse_mut(
             graph,
@@ -75,26 +75,15 @@ fn list_wp_assets(graph: &mut StructGraph, wp_field: NodeIndex) {
         panic!("{}", ONLY_WP_MSG);
     };
     wp.list();
-    proc_macro_error::emit_call_site_warning!(format!(
-        "{:?}{:?}",
-        wp.bound_types
-            .iter()
-            .map(|f| quote! {#f}.to_string())
-            .collect::<Vec<_>>(),
-        wp.bound_lifetimes
-            .iter()
-            .map(|f| quote! {#f}.to_string())
-            .collect::<Vec<_>>(),
-    ));
 }
-fn traversal_in_generics(
+fn traversal_field_to_generics(
     graph: &mut StructGraph,
     node_field: NodeIndex,
     map: &IndexMap<String, NodeIndex>,
 ) {
     if let Some(start) = map.get(GENERICS_START_P) {
         let action = |graph: &mut StructGraph, _edge, node_generic| {
-            search_in_generics(graph, node_field, node_generic);
+            search_in_generics_by_field(graph, node_field, node_generic);
         };
         traverse_mut(
             graph,
@@ -106,7 +95,11 @@ fn traversal_in_generics(
     }
 }
 /** Checks whether any element in the field is defined in the generics. If it is defined, establishes a connection. */
-fn search_in_generics(graph: &mut StructGraph, node_field: NodeIndex, node_generic: NodeIndex) {
+fn search_in_generics_by_field(
+    graph: &mut StructGraph,
+    node_field: NodeIndex,
+    node_generic: NodeIndex,
+) {
     let StructElement::Generic(generic) = &graph[node_generic] else {
         panic!("{}", ONLY_GENERIC_MSG);
     };
@@ -135,33 +128,33 @@ fn search_in_generics(graph: &mut StructGraph, node_field: NodeIndex, node_gener
         graph.add_edge(
             node_field,
             node_generic,
-            StructRelation::FieldGenericsInMainType,
+            StructRelation::FieldGenericInMainType,
         );
     }
     if lifetime_found {
         graph.add_edge(
             node_field,
             node_generic,
-            StructRelation::FieldGenericsInMainLifetime,
+            StructRelation::FieldGenericInMainLifetime,
         );
     }
     if const_param_found {
         graph.add_edge(
             node_field,
             node_generic,
-            StructRelation::FieldGenericsInMainConst,
+            StructRelation::FieldGenericInMainConst,
         );
     }
 }
 
-fn traversal_in_where_clause(
+fn traversal_field_to_where_clause(
     graph: &mut StructGraph,
     node_field: NodeIndex,
     map: &IndexMap<String, NodeIndex>,
 ) {
     if let Some(start) = map.get(WHERE_PREDICATE_START_P) {
         let action = |graph: &mut StructGraph, _edge, node_wp| {
-            search_in_wp(graph, node_field, node_wp);
+            search_in_wp_by_field(graph, node_field, node_wp);
         };
 
         traverse_mut(
@@ -174,7 +167,7 @@ fn traversal_in_where_clause(
     }
 }
 /** Checks whether any element in the field is defined in where clause of the generics. If it is defined, establishes a connection. */
-fn search_in_wp(graph: &mut StructGraph, node_field: NodeIndex, node_wp: NodeIndex) {
+fn search_in_wp_by_field(graph: &mut StructGraph, node_field: NodeIndex, node_wp: NodeIndex) {
     let StructElement::WherePredicate(wp) = &graph[node_wp] else {
         panic!("{}", ONLY_WP_MSG);
     };
@@ -202,7 +195,52 @@ fn search_in_wp(graph: &mut StructGraph, node_field: NodeIndex, node_wp: NodeInd
         graph.add_edge(
             node_field,
             node_wp,
-            StructRelation::FieldGenericsInWhereClause,
+            StructRelation::FieldGenericInWhereClause,
+        );
+    }
+}
+fn traversal_wp_to_generics(
+    graph: &mut StructGraph,
+    node_wp: NodeIndex,
+    map: &IndexMap<String, NodeIndex>,
+) {
+    if let Some(start) = map.get(GENERICS_START_P) {
+        let action = |graph: &mut StructGraph, _edge, node_generic| {
+            search_in_generics_by_wp(graph, node_wp, node_generic);
+        };
+
+        traverse_mut(
+            graph,
+            Some(&[&StructRelation::GenericTrain]),
+            *start,
+            true,
+            action,
+        );
+    }
+}
+fn search_in_generics_by_wp(graph: &mut StructGraph, node_wp: NodeIndex, node_generic: NodeIndex) {
+    let StructElement::Generic(generic) = &graph[node_generic] else {
+        panic!("{}", ONLY_GENERIC_MSG);
+    };
+    let StructElement::WherePredicate(wp) = &graph[node_wp] else {
+        panic!("{}", ONLY_WP_MSG);
+    };
+    let found = match generic.syn.as_ref() {
+        GenericParam::Lifetime(lifetime_param) => wp
+            .bound_lifetimes
+            .iter()
+            .any(|wp_lifetime| wp_lifetime == &lifetime_param.lifetime),
+        GenericParam::Type(type_param) => wp
+            .bound_types
+            .iter()
+            .any(|wp_type| type_equals_type_param(wp_type, type_param)),
+        GenericParam::Const(_const_param) => false,
+    };
+    if found {
+        graph.add_edge(
+            node_wp,
+            node_generic,
+            StructRelation::WherePredicateBoundInMain,
         );
     }
 }

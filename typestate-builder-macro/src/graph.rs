@@ -95,10 +95,11 @@ pub enum StructRelation {
     GenericTrain,
     WherePredicateTrain,
     FieldTrain,
-    FieldGenericsInMainType,
-    FieldGenericsInMainLifetime,
-    FieldGenericsInMainConst,
-    FieldGenericsInWhereClause,
+    FieldGenericInMainType,
+    FieldGenericInMainLifetime,
+    FieldGenericInMainConst,
+    FieldGenericInWhereClause,
+    WherePredicateBoundInMain,
 }
 
 pub type StructGraph = Graph<StructElement, StructRelation>;

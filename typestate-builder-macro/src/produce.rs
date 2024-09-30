@@ -128,28 +128,28 @@ impl<'a> BuilderStatePair<'a> {
         };
         let to_main_lifetimes = traverse(
             graph,
-            Some(&[&StructRelation::FieldGenericsInMainLifetime]),
+            Some(&[&StructRelation::FieldGenericInMainLifetime]),
             field_node,
             false,
             Self::traverse_to_main_generics,
         );
         let to_main_consts = traverse(
             graph,
-            Some(&[&StructRelation::FieldGenericsInMainConst]),
+            Some(&[&StructRelation::FieldGenericInMainConst]),
             field_node,
             false,
             Self::traverse_to_main_generics,
         );
         let to_main_types = traverse(
             graph,
-            Some(&[&StructRelation::FieldGenericsInMainType]),
+            Some(&[&StructRelation::FieldGenericInMainType]),
             field_node,
             false,
             Self::traverse_to_main_generics,
         );
         let to_where_predicates = traverse(
             graph,
-            Some(&[&StructRelation::FieldGenericsInWhereClause]),
+            Some(&[&StructRelation::FieldGenericInWhereClause]),
             field_node,
             false,
             Self::traverse_to_where_predicate,
