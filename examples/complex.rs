@@ -1,16 +1,15 @@
 #![allow(dead_code)]
 
-use std::marker::PhantomData;
-
 use typestate_builder::TypestateBuilder;
 
 fn main() {}
 
 #[derive(TypestateBuilder)]
-struct AdvancedPhantomStruct<'a, T>
+struct GenericStruct<T, U>
 where
-    T: 'a + Clone,
+    T: Copy,
+    U: Copy,
 {
-    reference: &'a T,
-    marker: PhantomData<T>,
+    field1: T,
+    field2: U,
 }

@@ -75,8 +75,8 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
             .map(|(nth, syn)| WherePredicate {
                 nth,
                 syn: Rc::new(syn),
-                bound_types: IndexSet::new(),
-                bound_lifetimes: IndexSet::new(),
+                bound_types: Vec::new(),
+                bound_lifetimes: Vec::new(),
             })
             .collect::<Vec<_>>();
         add_from_list!(
