@@ -84,26 +84,42 @@ fn search_in_generics(graph: &mut StructGraph, node_field: NodeIndex, node_gener
     let StructElement::Field(field) = &graph[node_field] else {
         panic!("{}", ONLY_FIELD_MSG);
     };
-    let found = field
+    let type_found = field
         .types
         .iter()
-        .any(|type_ident| type_ident == generic_ident)
-        || field
-            .lifetimes
-            .iter()
-            .any(|lifetime| &lifetime.ident == generic_ident)
-        || field
-            .const_params
-            .iter()
-            .any(|const_param_ident| const_param_ident == generic_ident);
-    if found {
+        .any(|type_ident| type_ident == generic_ident);
+
+    let lifetime_found = field
+        .lifetimes
+        .iter()
+        .any(|lifetime| &lifetime.ident == generic_ident);
+    let const_param_found = field
+        .const_params
+        .iter()
+        .any(|const_param_ident| const_param_ident == generic_ident);
+    if type_found {
         graph.add_edge(
             node_field,
             node_generic,
-            StructRelation::FieldGenericsInMain,
+            StructRelation::FieldGenericsInMainType,
+        );
+    }
+    if lifetime_found {
+        graph.add_edge(
+            node_field,
+            node_generic,
+            StructRelation::FieldGenericsInMainLifetime,
+        );
+    }
+    if const_param_found {
+        graph.add_edge(
+            node_field,
+            node_generic,
+            StructRelation::FieldGenericsInMainConst,
         );
     }
 }
+
 fn traversal_in_where_clause(
     graph: &mut StructGraph,
     node_field: NodeIndex,

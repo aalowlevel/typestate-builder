@@ -95,7 +95,9 @@ pub enum StructRelation {
     GenericTrain,
     WherePredicateTrain,
     FieldTrain,
-    FieldGenericsInMain,
+    FieldGenericsInMainType,
+    FieldGenericsInMainLifetime,
+    FieldGenericsInMainConst,
     FieldGenericsInWhereClause,
 }
 
