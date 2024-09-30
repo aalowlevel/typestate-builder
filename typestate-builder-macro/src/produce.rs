@@ -15,6 +15,7 @@ use std::borrow::Cow;
 use std::rc::Rc;
 
 use indexmap::IndexMap;
+use indexmap::IndexSet;
 use petgraph::graph::EdgeIndex;
 use petgraph::graph::NodeIndex;
 use proc_macro2::Span;
@@ -22,6 +23,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::format_ident;
 use quote::quote;
 use syn::Ident;
+use syn::Lifetime;
 use syn::Type;
 
 use crate::graph::{traverse, StructElement, StructGraph, StructRelation, FIELD_START_P};
@@ -35,7 +37,6 @@ pub fn run(
     if let Some(builder_states) = BuilderStates::run(&graph, &map) {
         res.extend(builder_states.into_iter().map(|(_k, v)| v));
     }
-    // proc_macro_error::emit_call_site_warning!(format!("{:#?}", builder_states));
     (graph, map, res)
 }
 
@@ -51,23 +52,30 @@ impl BuilderStates {
                 main_ident,
                 ident,
                 ty,
-                to_main_generics,
+                types,
+                lifetimes,
+                const_params,
                 to_where_predicates,
             } = BuilderStatePair::new(graph, field_node, map);
+
             let ident_added = format_ident!("{}{}Added", main_ident, ident_to_titlecase(&ident));
             let ident_empty = format_ident!("{}{}Empty", main_ident, ident_to_titlecase(&ident));
-            let to_main_generics = to_main_generics.values().collect::<Vec<_>>();
-            let generics = if to_main_generics.is_empty() {
+
+            let generics = types.values().collect::<Vec<_>>();
+            proc_macro_error::emit_call_site_warning!(format!("{:?}", generics));
+            let generics = if generics.is_empty() {
                 quote! {}
             } else {
-                quote! { < #(#to_main_generics),* > }
+                quote! { < #(#generics),* > }
             };
+
             let to_where_predicates = to_where_predicates.values().collect::<Vec<_>>();
             let where_clause = if to_where_predicates.is_empty() {
                 quote! {}
             } else {
                 quote! { where #(#to_where_predicates),* }
             };
+
             quote! {
                 struct #ident_added #generics(#ty) #where_clause;
                 struct #ident_empty;
@@ -90,7 +98,9 @@ struct BuilderStatePair<'a> {
     main_ident: &'a Ident,
     ident: Cow<'a, Ident>,
     ty: &'a Type,
-    to_main_generics: IndexMap<NodeIndex, Rc<syn::GenericParam>>,
+    types: &'a IndexSet<Ident>,
+    lifetimes: &'a IndexSet<Lifetime>,
+    const_params: &'a IndexSet<Ident>,
     to_where_predicates: IndexMap<NodeIndex, Rc<syn::WherePredicate>>,
 }
 
@@ -114,14 +124,6 @@ impl<'a> BuilderStatePair<'a> {
                 Span::call_site(),
             ))
         };
-        let ty = &field.syn.ty;
-        let to_main_generics = traverse(
-            graph,
-            Some(&[&StructRelation::FieldGenericsInMain]),
-            field_node,
-            false,
-            Self::traverse_to_main_generics,
-        );
         let to_where_predicates = traverse(
             graph,
             Some(&[&StructRelation::FieldGenericsInWhereClause]),
@@ -132,21 +134,12 @@ impl<'a> BuilderStatePair<'a> {
         Self {
             main_ident,
             ident,
-            ty,
-            to_main_generics,
+            ty: &field.syn.ty,
+            types: &field.types,
+            lifetimes: &field.lifetimes,
+            const_params: &field.const_params,
             to_where_predicates,
         }
-    }
-
-    fn traverse_to_main_generics(
-        graph: &StructGraph,
-        _edge: Option<EdgeIndex>,
-        generic_node: NodeIndex,
-    ) -> Rc<syn::GenericParam> {
-        let StructElement::Generic(generic) = &graph[generic_node] else {
-            panic!("Node must be a generic.");
-        };
-        Rc::clone(&generic.syn)
     }
 
     fn traverse_to_where_predicate(

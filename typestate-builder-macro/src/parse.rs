@@ -95,7 +95,7 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
                 .map(|(nth, syn)| Field {
                     nth,
                     syn,
-                    idents: IndexSet::new(),
+                    types: IndexSet::new(),
                     lifetimes: IndexSet::new(),
                     const_params: IndexSet::new(),
                 })
@@ -110,7 +110,7 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
                 .map(|(nth, syn)| Field {
                     nth,
                     syn,
-                    idents: IndexSet::new(),
+                    types: IndexSet::new(),
                     lifetimes: IndexSet::new(),
                     const_params: IndexSet::new(),
                 })

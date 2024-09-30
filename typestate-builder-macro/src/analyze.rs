@@ -85,7 +85,7 @@ fn search_in_generics(graph: &mut StructGraph, node_field: NodeIndex, node_gener
         panic!("{}", ONLY_FIELD_MSG);
     };
     let found = field
-        .idents
+        .types
         .iter()
         .any(|type_ident| type_ident == generic_ident)
         || field
@@ -137,7 +137,7 @@ fn search_in_wp(graph: &mut StructGraph, node_field: NodeIndex, node_wp: NodeInd
         panic!("{}", ONLY_FIELD_MSG);
     };
     let found = field
-        .idents
+        .types
         .iter()
         .any(|type_ident| Some(type_ident) == wp_ident)
         || field

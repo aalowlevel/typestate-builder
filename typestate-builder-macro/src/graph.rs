@@ -104,7 +104,7 @@ pub type StructGraph = Graph<StructElement, StructRelation>;
 pub struct Field {
     pub nth: usize,
     pub syn: syn::Field,
-    pub idents: IndexSet<Ident>,
+    pub types: IndexSet<Ident>,
     pub lifetimes: IndexSet<Lifetime>,
     pub const_params: IndexSet<Ident>,
 }
@@ -132,7 +132,7 @@ impl Field {
     pub fn list(&mut self) {
         Self::list_type(
             &self.syn.ty,
-            &mut self.idents,
+            &mut self.types,
             &mut self.lifetimes,
             &mut self.const_params,
         );
