@@ -69,11 +69,11 @@ impl BuilderStates {
             for (wp, wpgs) in field_to_where_predicates.values() {
                 where_predicates.push(wp);
                 for wpg in wpgs.values() {
-                    Self::compare_generics(
-                        wpg,
+                    Self::compare_generic_params(
                         &mut field_to_main_lifetimes,
                         &mut field_to_main_types,
                         &mut field_to_main_consts,
+                        wpg,
                     );
                 }
             }
@@ -111,12 +111,40 @@ impl BuilderStates {
         })
     }
 
-    fn compare_generics(
-        wpg: &Rc<syn::GenericParam>,
-        field_to_main_lifetimes: &mut Vec<&Rc<syn::GenericParam>>,
+    fn compare_generic_params<'a>(
+        field_to_main_lifetimes: &mut Vec<&'a Rc<syn::GenericParam>>,
         field_to_main_types: &mut Vec<&Rc<syn::GenericParam>>,
         field_to_main_consts: &mut Vec<&Rc<syn::GenericParam>>,
+        wpg: &'a Rc<syn::GenericParam>,
     ) {
+        match wpg.as_ref() {
+            syn::GenericParam::Lifetime(lifetime_param) => {
+                Self::compare_generic_params_lifetimes(
+                    field_to_main_lifetimes,
+                    wpg,
+                    lifetime_param,
+                );
+            }
+            syn::GenericParam::Type(type_param) => {}
+            syn::GenericParam::Const(const_param) => {}
+        }
+    }
+
+    fn compare_generic_params_lifetimes<'a>(
+        field_to_main_lifetimes: &mut Vec<&'a Rc<syn::GenericParam>>,
+        wpg: &'a Rc<syn::GenericParam>,
+        lifetime_param: &syn::LifetimeParam,
+    ) {
+        let found = field_to_main_lifetimes.iter().any(|f| {
+            if let syn::GenericParam::Lifetime(f) = f.as_ref() {
+                f.lifetime == lifetime_param.lifetime
+            } else {
+                true
+            }
+        });
+        if !found {
+            field_to_main_lifetimes.push(wpg);
+        }
     }
 }
 
