@@ -304,6 +304,87 @@ impl Serialize for GenericParam {
 pub struct WherePredicate {
     pub nth: usize,
     pub syn: Rc<syn::WherePredicate>,
+    pub bound_types: IndexSet<Type>,
+    pub bound_lifetimes: IndexSet<syn::Lifetime>,
+}
+
+impl WherePredicate {
+    pub fn list(&mut self) {
+        match self.syn.as_ref() {
+            syn::WherePredicate::Type(pred_type) => {
+                let bounded_ty = pred_type.bounded_ty.clone();
+                let bounds = pred_type.bounds.clone();
+
+                self.collect_from_type(&bounded_ty);
+                for bound in &bounds {
+                    self.collect_from_type_param_bound(bound);
+                }
+            }
+            syn::WherePredicate::Lifetime(pred_lifetime) => {
+                let lifetime = pred_lifetime.lifetime.clone();
+                let bounds = pred_lifetime.bounds.clone();
+
+                self.bound_lifetimes.insert(lifetime);
+                for bound in &bounds {
+                    self.bound_lifetimes.insert(bound.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn collect_from_type(&mut self, ty: &syn::Type) {
+        match ty {
+            syn::Type::Path(type_path) => {
+                self.bound_types.insert(Type::from(type_path.clone()));
+                for segment in &type_path.path.segments {
+                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                        for arg in &args.args {
+                            match arg {
+                                syn::GenericArgument::Type(t) => self.collect_from_type(t),
+                                syn::GenericArgument::Lifetime(l) => {
+                                    self.bound_lifetimes.insert(l.clone());
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+            syn::Type::Reference(type_ref) => {
+                if let Some(lifetime) = &type_ref.lifetime {
+                    self.bound_lifetimes.insert(lifetime.clone());
+                }
+                self.collect_from_type(&type_ref.elem);
+            }
+            // Add more cases as needed for other syn::Type variants
+            _ => {}
+        }
+    }
+
+    fn collect_from_type_param_bound(&mut self, bound: &syn::TypeParamBound) {
+        match bound {
+            syn::TypeParamBound::Trait(trait_bound) => {
+                for segment in &trait_bound.path.segments {
+                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                        for arg in &args.args {
+                            match arg {
+                                syn::GenericArgument::Type(t) => self.collect_from_type(t),
+                                syn::GenericArgument::Lifetime(l) => {
+                                    self.bound_lifetimes.insert(l.clone());
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+            syn::TypeParamBound::Lifetime(lifetime) => {
+                self.bound_lifetimes.insert(lifetime.clone());
+            }
+            _ => {}
+        }
+    }
 }
 
 impl Serialize for WherePredicate {

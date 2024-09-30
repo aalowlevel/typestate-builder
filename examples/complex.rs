@@ -1,22 +1,16 @@
 #![allow(dead_code)]
 
+use std::marker::PhantomData;
+
 use typestate_builder::TypestateBuilder;
 
 fn main() {}
 
-pub(crate) trait MyTrait {}
-
 #[derive(TypestateBuilder)]
-pub(crate) struct MultiBoundGeneric<'a, T, B, const L: usize, U, V>
+struct AdvancedPhantomStruct<'a, T>
 where
-    T: Clone + Default + std::fmt::Debug,
-    U: Into<String> + Copy,
-    V: MyTrait,
+    T: 'a + Clone,
 {
-    item1: T,
-    item2: U,
-    data: Vec<T>,
-    borrowed: &'a B,
-    consted: [u32; L],
-    my_trait: V,
+    reference: &'a T,
+    marker: PhantomData<T>,
 }

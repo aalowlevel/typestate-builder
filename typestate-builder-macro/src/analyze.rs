@@ -13,6 +13,7 @@
 
 use indexmap::IndexMap;
 use petgraph::graph::NodeIndex;
+use quote::quote;
 use syn::{GenericParam, WherePredicate};
 
 use crate::{
@@ -25,6 +26,7 @@ use crate::{
 
 pub fn run(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex>) {
     bind_field_elements(graph, map);
+    bind_where_predicate_elements(graph, map);
 }
 
 fn bind_field_elements(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex>) {
@@ -44,6 +46,21 @@ fn bind_field_elements(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex
     }
 }
 
+fn bind_where_predicate_elements(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex>) {
+    if let Some(start) = map.get(WHERE_PREDICATE_START_P) {
+        let action = |graph: &mut StructGraph, _edge, node_wp| {
+            list_wp_assets(graph, node_wp);
+        };
+        traverse_mut(
+            graph,
+            Some(&[&StructRelation::WherePredicateTrain]),
+            *start,
+            true,
+            action,
+        );
+    }
+}
+
 const ONLY_FIELD_MSG: &str = "Only Field is accepted.";
 const ONLY_GENERIC_MSG: &str = "Only Generic is accepted.";
 const ONLY_WP_MSG: &str = "Only Where Predicate is accepted.";
@@ -52,6 +69,23 @@ fn list_field_assets(graph: &mut StructGraph, node_field: NodeIndex) {
         panic!("{}", ONLY_FIELD_MSG);
     };
     field.list();
+}
+fn list_wp_assets(graph: &mut StructGraph, wp_field: NodeIndex) {
+    let StructElement::WherePredicate(wp) = &mut graph[wp_field] else {
+        panic!("{}", ONLY_WP_MSG);
+    };
+    wp.list();
+    proc_macro_error::emit_call_site_warning!(format!(
+        "{:?}{:?}",
+        wp.bound_types
+            .iter()
+            .map(|f| quote! {#f}.to_string())
+            .collect::<Vec<_>>(),
+        wp.bound_lifetimes
+            .iter()
+            .map(|f| quote! {#f}.to_string())
+            .collect::<Vec<_>>(),
+    ));
 }
 fn traversal_in_generics(
     graph: &mut StructGraph,
