@@ -52,30 +52,46 @@ impl BuilderStates {
                 main_ident,
                 ident,
                 ty,
-                to_main_lifetimes,
-                to_main_consts,
-                to_main_types,
-                to_where_predicates,
+                field_to_main_lifetimes,
+                field_to_main_consts,
+                field_to_main_types,
+                field_to_where_predicates,
             } = BuilderStatePair::new(graph, field_node, map);
 
             let ident_added = format_ident!("{}{}Added", main_ident, ident_to_titlecase(&ident));
             let ident_empty = format_ident!("{}{}Empty", main_ident, ident_to_titlecase(&ident));
 
+            let mut field_to_main_lifetimes = field_to_main_lifetimes.values().collect::<Vec<_>>();
+            let mut field_to_main_consts = field_to_main_consts.values().collect::<Vec<_>>();
+            let mut field_to_main_types = field_to_main_types.values().collect::<Vec<_>>();
+
+            let mut where_predicates = Vec::new();
+            for (wp, wpgs) in field_to_where_predicates.values() {
+                where_predicates.push(wp);
+                for wpg in wpgs.values() {
+                    Self::compare_generics(
+                        wpg,
+                        &mut field_to_main_lifetimes,
+                        &mut field_to_main_types,
+                        &mut field_to_main_consts,
+                    );
+                }
+            }
+
             let mut generics = Vec::new();
-            generics.extend(to_main_lifetimes.values());
-            generics.extend(to_main_consts.values());
-            generics.extend(to_main_types.values());
+            generics.extend(field_to_main_lifetimes);
+            generics.extend(field_to_main_consts);
+            generics.extend(field_to_main_types);
             let generics = if generics.is_empty() {
                 quote! {}
             } else {
                 quote! { < #(#generics),* > }
             };
 
-            let to_where_predicates = to_where_predicates.values().collect::<Vec<_>>();
-            let where_clause = if to_where_predicates.is_empty() {
+            let where_clause = if where_predicates.is_empty() {
                 quote! {}
             } else {
-                quote! { where #(#to_where_predicates),* }
+                quote! { where #(#where_predicates),* }
             };
 
             quote! {
@@ -94,16 +110,32 @@ impl BuilderStates {
             )
         })
     }
+
+    fn compare_generics(
+        wpg: &Rc<syn::GenericParam>,
+        field_to_main_lifetimes: &mut Vec<&Rc<syn::GenericParam>>,
+        field_to_main_types: &mut Vec<&Rc<syn::GenericParam>>,
+        field_to_main_consts: &mut Vec<&Rc<syn::GenericParam>>,
+    ) {
+    }
 }
+
+type FieldToWherePredicates = IndexMap<
+    NodeIndex,
+    (
+        Rc<syn::WherePredicate>,
+        IndexMap<NodeIndex, Rc<syn::GenericParam>>,
+    ),
+>;
 
 struct BuilderStatePair<'a> {
     main_ident: &'a Ident,
     ident: Cow<'a, Ident>,
     ty: &'a Type,
-    to_main_lifetimes: IndexMap<NodeIndex, Rc<syn::GenericParam>>,
-    to_main_consts: IndexMap<NodeIndex, Rc<syn::GenericParam>>,
-    to_main_types: IndexMap<NodeIndex, Rc<syn::GenericParam>>,
-    to_where_predicates: IndexMap<NodeIndex, Rc<syn::WherePredicate>>,
+    field_to_main_lifetimes: IndexMap<NodeIndex, Rc<syn::GenericParam>>,
+    field_to_main_consts: IndexMap<NodeIndex, Rc<syn::GenericParam>>,
+    field_to_main_types: IndexMap<NodeIndex, Rc<syn::GenericParam>>,
+    field_to_where_predicates: FieldToWherePredicates,
 }
 
 impl<'a> BuilderStatePair<'a> {
@@ -126,46 +158,46 @@ impl<'a> BuilderStatePair<'a> {
                 Span::call_site(),
             ))
         };
-        let to_main_lifetimes = traverse(
+        let field_to_main_lifetimes = traverse(
             graph,
             Some(&[&StructRelation::FieldGenericInMainLifetime]),
             field_node,
             false,
-            Self::traverse_to_main_generics,
+            Self::traverse_field_to_main_generics,
         );
-        let to_main_consts = traverse(
+        let field_to_main_consts = traverse(
             graph,
             Some(&[&StructRelation::FieldGenericInMainConst]),
             field_node,
             false,
-            Self::traverse_to_main_generics,
+            Self::traverse_field_to_main_generics,
         );
-        let to_main_types = traverse(
+        let field_to_main_types = traverse(
             graph,
             Some(&[&StructRelation::FieldGenericInMainType]),
             field_node,
             false,
-            Self::traverse_to_main_generics,
+            Self::traverse_field_to_main_generics,
         );
-        let to_where_predicates = traverse(
+        let field_to_where_predicates = traverse(
             graph,
             Some(&[&StructRelation::FieldGenericInWhereClause]),
             field_node,
             false,
-            Self::traverse_to_where_predicate,
+            Self::traverse_field_to_where_predicate,
         );
         Self {
             main_ident,
             ident,
             ty: &field.syn.ty,
-            to_main_lifetimes,
-            to_main_consts,
-            to_main_types,
-            to_where_predicates,
+            field_to_main_lifetimes,
+            field_to_main_consts,
+            field_to_main_types,
+            field_to_where_predicates,
         }
     }
 
-    fn traverse_to_main_generics(
+    fn traverse_field_to_main_generics(
         graph: &StructGraph,
         _edge: Option<EdgeIndex>,
         generic_node: NodeIndex,
@@ -176,15 +208,36 @@ impl<'a> BuilderStatePair<'a> {
         Rc::clone(&generic.syn)
     }
 
-    fn traverse_to_where_predicate(
+    fn traverse_field_to_where_predicate(
+        graph: &StructGraph,
+        _edge: Option<EdgeIndex>,
+        wp_node: NodeIndex,
+    ) -> (
+        Rc<syn::WherePredicate>,
+        IndexMap<NodeIndex, Rc<syn::GenericParam>>,
+    ) {
+        let StructElement::WherePredicate(wp) = &graph[wp_node] else {
+            panic!("Node must be a Where Predicate.");
+        };
+        let wp_to_main_generics = traverse(
+            graph,
+            Some(&[&StructRelation::WherePredicateBoundInMain]),
+            wp_node,
+            false,
+            Self::traverse_wp_to_main_generics,
+        );
+        (Rc::clone(&wp.syn), wp_to_main_generics)
+    }
+
+    fn traverse_wp_to_main_generics(
         graph: &StructGraph,
         _edge: Option<EdgeIndex>,
         generic_node: NodeIndex,
-    ) -> Rc<syn::WherePredicate> {
-        let StructElement::WherePredicate(wp) = &graph[generic_node] else {
-            panic!("Node must be a Where Predicate.");
+    ) -> Rc<syn::GenericParam> {
+        let StructElement::Generic(generic) = &graph[generic_node] else {
+            panic!("Node must be a generic.");
         };
-        Rc::clone(&wp.syn)
+        Rc::clone(&generic.syn)
     }
 }
 
