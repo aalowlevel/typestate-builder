@@ -6,8 +6,6 @@ use typestate_builder::TypestateBuilder;
 
 fn main() {}
 
-pub(crate) trait MyTrait {}
-
 #[derive(TypestateBuilder)]
 struct AdvancedPhantomStruct<'a, T>
 where

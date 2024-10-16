@@ -14,7 +14,7 @@
 use std::{fs::File, io::Write};
 
 use petgraph::{dot::Dot, Graph};
-use syn::{Ident, Path, PathArguments, Type, TypeParam, TypePath};
+use syn::{Ident, PathArguments, Type};
 
 pub fn extract_ident(ty: &Type) -> Option<&Ident> {
     match ty {
@@ -68,22 +68,4 @@ pub fn ident_to_titlecase(syn: &syn::Ident) -> String {
             }
         })
         .collect()
-}
-
-pub fn type_equals_type_param(ty: &Type, param: &TypeParam) -> bool {
-    match ty {
-        Type::Path(TypePath { path, .. }) => path_equals_type_param(path, param),
-        _ => false, // Other variants of Type are not considered equal to TypeParam
-    }
-}
-
-fn path_equals_type_param(path: &Path, param: &TypeParam) -> bool {
-    if path.segments.len() != 1 {
-        return false;
-    }
-
-    let segment = &path.segments[0];
-
-    // Compare the identifier of the path segment with the identifier of the TypeParam
-    segment.ident == param.ident && segment.arguments.is_empty()
 }

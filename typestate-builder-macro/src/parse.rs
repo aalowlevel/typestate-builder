@@ -76,8 +76,8 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
                 nth,
                 syn: Rc::new(syn),
                 left_bound_lifetimes: None,
-                left_bounded_types: None,
-                left_bounded_lifetimes: None,
+                left_bounded_type: None,
+                left_bounded_lifetime: None,
                 right_bounding_types: None,
                 right_bounding_lifetimes: None,
             })

@@ -29,15 +29,18 @@ use syn::Type;
 use crate::graph::{traverse, StructElement, StructGraph, StructRelation, FIELD_START_P};
 use crate::helper::ident_to_titlecase;
 
-pub fn run(
-    graph: StructGraph,
-    map: IndexMap<String, NodeIndex>,
-) -> (StructGraph, IndexMap<String, NodeIndex>, Vec<TokenStream2>) {
+pub struct Produce {
+    pub graph: StructGraph,
+    pub map: IndexMap<String, NodeIndex>,
+    pub res: Vec<TokenStream2>,
+}
+
+pub fn run(graph: StructGraph, map: IndexMap<String, NodeIndex>) -> Produce {
     let mut res = Vec::new();
     if let Some(builder_states) = BuilderStates::run(&graph, &map) {
         res.extend(builder_states.into_iter().map(|(_k, v)| v));
     }
-    (graph, map, res)
+    Produce { graph, map, res }
 }
 
 struct BuilderStates;
@@ -100,6 +103,7 @@ impl BuilderStates {
             }
         };
 
+        // Traverse on field train.
         map.get(FIELD_START_P).map(|start| {
             traverse(
                 graph,
@@ -249,7 +253,12 @@ impl<'a> BuilderStatePair<'a> {
         };
         let wp_to_main_generics = traverse(
             graph,
-            Some(&[&StructRelation::WherePredicateBoundInMain]),
+            Some(&[
+                &StructRelation::WPLeftBoundedLifetimeInMain,
+                &StructRelation::WPLeftBoundedTypeInMain,
+                &StructRelation::WPRightBoundingLifetimeInMain,
+                &StructRelation::WPRightBoundingTypeInMain,
+            ]),
             wp_node,
             false,
             Self::traverse_wp_to_main_generics,

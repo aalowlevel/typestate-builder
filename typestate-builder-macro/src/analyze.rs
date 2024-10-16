@@ -20,7 +20,7 @@ use crate::{
         traverse_mut, StructElement, StructGraph, StructRelation, FIELD_START_P, GENERICS_START_P,
         WHERE_PREDICATE_START_P,
     },
-    helper::{extract_ident, type_equals_type_param},
+    helper::extract_ident,
 };
 
 pub fn run(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex>) {
@@ -74,7 +74,18 @@ fn list_wp_assets(graph: &mut StructGraph, wp_field: NodeIndex) {
     let StructElement::WherePredicate(wp) = &mut graph[wp_field] else {
         panic!("{}", ONLY_WP_MSG);
     };
-    wp.list();
+    let (
+        left_bound_lifetimes,
+        left_bounded_type,
+        left_bounded_lifetime,
+        right_bounding_types,
+        right_bounding_lifetimes,
+    ) = wp.list();
+    wp.left_bound_lifetimes = left_bound_lifetimes;
+    wp.left_bounded_type = left_bounded_type;
+    wp.left_bounded_lifetime = left_bounded_lifetime;
+    wp.right_bounding_types = right_bounding_types;
+    wp.right_bounding_lifetimes = right_bounding_lifetimes;
 }
 fn traversal_field_to_generics(
     graph: &mut StructGraph,
@@ -225,22 +236,72 @@ fn search_in_generics_by_wp(graph: &mut StructGraph, node_wp: NodeIndex, node_ge
     let StructElement::WherePredicate(wp) = &graph[node_wp] else {
         panic!("{}", ONLY_WP_MSG);
     };
-    let found = match generic.syn.as_ref() {
-        GenericParam::Lifetime(lifetime_param) => wp
-            .bound_lifetimes
-            .iter()
-            .any(|wp_lifetime| wp_lifetime == &lifetime_param.lifetime),
-        GenericParam::Type(type_param) => wp
-            .bound_types
-            .iter()
-            .any(|wp_type| type_equals_type_param(wp_type, type_param)),
-        GenericParam::Const(_const_param) => false,
-    };
-    if found {
-        graph.add_edge(
-            node_wp,
-            node_generic,
-            StructRelation::WherePredicateBoundInMain,
-        );
+    match generic.syn.as_ref() {
+        GenericParam::Lifetime(lifetime_param) => {
+            let mut left = false;
+            let mut right = false;
+
+            if let Some(lt_generic) = &wp.left_bounded_lifetime {
+                left = lt_generic == &lifetime_param.lifetime;
+            }
+            if let Some(lts_wp) = &wp.right_bounding_lifetimes {
+                for lt_wp in lts_wp {
+                    if lt_wp == &lifetime_param.lifetime {
+                        right = true;
+                    }
+                }
+            }
+
+            if left {
+                graph.add_edge(
+                    node_wp,
+                    node_generic,
+                    StructRelation::WPLeftBoundedLifetimeInMain,
+                );
+            }
+            if right {
+                graph.add_edge(
+                    node_wp,
+                    node_generic,
+                    StructRelation::WPRightBoundingLifetimeInMain,
+                );
+            }
+        }
+        GenericParam::Type(type_param) => {
+            let mut left = false;
+            let mut right = false;
+
+            if let Some(syn::Type::Path(type_path)) = &wp.left_bounded_type {
+                if let Some(ident) = type_path.path.get_ident() {
+                    left = ident == &type_param.ident;
+                }
+            }
+            if let Some(tys_wp) = &wp.right_bounding_types {
+                for ty_wp in tys_wp {
+                    if let syn::Type::Path(type_path) = ty_wp {
+                        if let Some(ident) = type_path.path.get_ident() {
+                            if ident == &type_param.ident {
+                                right = true;
+                            }
+                        }
+                    }
+                }
+            }
+            if left {
+                graph.add_edge(
+                    node_wp,
+                    node_generic,
+                    StructRelation::WPLeftBoundedTypeInMain,
+                );
+            }
+            if right {
+                graph.add_edge(
+                    node_wp,
+                    node_generic,
+                    StructRelation::WPRightBoundingTypeInMain,
+                );
+            }
+        }
+        GenericParam::Const(_const_param) => {}
     }
 }
