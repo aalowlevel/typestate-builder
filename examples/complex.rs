@@ -18,7 +18,7 @@ struct AdvancedPhantomStructReferenceAdded<'a, T>(&'a T)
 where
     T: 'a + Clone;
 struct AdvancedPhantomStructReferenceEmpty;
-struct AdvancedPhantomStructMarkerAdded<'a, T>(PhantomData<T>)
+struct AdvancedPhantomStructMarkerAdded<T>(PhantomData<T>)
 where
     T: 'a + Clone;
 struct AdvancedPhantomStructMarkerEmpty;

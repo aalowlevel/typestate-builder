@@ -48,36 +48,41 @@ struct BuilderStates;
 impl BuilderStates {
     fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> Option<Vec<TokenStream2>> {
         let action = |graph: &StructGraph, _edge, field_node| -> TokenStream2 {
+            // All data to crate two-legged state structs.
             let BuilderStatePair {
                 main_ident,
                 ident,
                 ty,
-                mut field_to_main_lifetimes,
-                mut field_to_main_consts,
-                mut field_to_main_types,
+                field_to_main_lifetimes,
+                field_to_main_consts,
+                field_to_main_types,
                 field_to_where_predicates,
             } = BuilderStatePair::new(graph, field_node, map);
 
+            // Idents of pair.
             let ident_added = format_ident!("{}{}Added", main_ident, ident_to_titlecase(&ident));
             let ident_empty = format_ident!("{}{}Empty", main_ident, ident_to_titlecase(&ident));
 
+            // Determining where predicates related to the field.
             let mut where_predicates = Vec::new();
-            for (wp, wpgs) in field_to_where_predicates {
-                where_predicates.push(wp);
-                for wpg in wpgs {
-                    Self::compare_generic_params(
-                        &mut field_to_main_lifetimes,
-                        &mut field_to_main_types,
-                        &mut field_to_main_consts,
-                        wpg,
-                    );
+            for field_to_where_predicate in field_to_where_predicates {
+                where_predicates.push(field_to_where_predicate.wp);
+                for wpg in field_to_where_predicate.in_generics {
+                    // Self::compare_generic_params(
+                    //     &mut field_to_main_lifetimes,
+                    //     &mut field_to_main_types,
+                    //     &mut field_to_main_consts,
+                    //     wpg,
+                    // );
                 }
             }
 
+            // Determining main generics related to the field.
             let mut generics = Vec::new();
             generics.extend(field_to_main_lifetimes);
             generics.extend(field_to_main_consts);
             generics.extend(field_to_main_types);
+            // proc_macro_error::emit_call_site_warning!(format!("{:#?}", generics));
             let generics = if generics.is_empty() {
                 quote! {}
             } else {
@@ -145,7 +150,10 @@ impl BuilderStates {
     }
 }
 
-type FieldToWherePredicates = Vec<(Rc<syn::WherePredicate>, Vec<Rc<syn::GenericParam>>)>;
+struct FieldToWherePredicate {
+    wp: Rc<syn::WherePredicate>,
+    in_generics: Vec<Rc<syn::GenericParam>>,
+}
 
 struct BuilderStatePair<'a> {
     main_ident: &'a Ident,
@@ -154,7 +162,7 @@ struct BuilderStatePair<'a> {
     field_to_main_lifetimes: Vec<Rc<syn::GenericParam>>,
     field_to_main_consts: Vec<Rc<syn::GenericParam>>,
     field_to_main_types: Vec<Rc<syn::GenericParam>>,
-    field_to_where_predicates: FieldToWherePredicates,
+    field_to_where_predicates: Vec<FieldToWherePredicate>,
 }
 
 impl<'a> BuilderStatePair<'a> {
@@ -231,7 +239,7 @@ impl<'a> BuilderStatePair<'a> {
         graph: &StructGraph,
         _edge: Option<EdgeIndex>,
         wp_node: NodeIndex,
-    ) -> (Rc<syn::WherePredicate>, Vec<Rc<syn::GenericParam>>) {
+    ) -> FieldToWherePredicate {
         let StructElement::WherePredicate(wp) = &graph[wp_node] else {
             panic!("Node must be a Where Predicate.");
         };
@@ -247,7 +255,10 @@ impl<'a> BuilderStatePair<'a> {
             false,
             Self::traverse_wp_to_main_generics,
         );
-        (Rc::clone(&wp.syn), wp_to_main_generics)
+        FieldToWherePredicate {
+            wp: Rc::clone(&wp.syn),
+            in_generics: wp_to_main_generics,
+        }
     }
 
     fn traverse_wp_to_main_generics(
