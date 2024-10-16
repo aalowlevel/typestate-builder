@@ -13,7 +13,7 @@
 
 use std::{collections::VecDeque, rc::Rc};
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexSet;
 use petgraph::{
     graph::{EdgeIndex, NodeIndex},
     Graph,
@@ -408,19 +408,19 @@ pub fn traverse<'a, N, E, F, R>(
     start_node: NodeIndex,
     include_start: bool,
     mut node_action: F,
-) -> IndexMap<NodeIndex, R>
+) -> Vec<R>
 where
     F: FnMut(&Graph<N, E>, Option<EdgeIndex>, NodeIndex) -> R,
     E: std::cmp::PartialEq,
 {
     let mut queue = VecDeque::new();
     let mut visited = IndexSet::new();
-    let mut results = IndexMap::new();
+    let mut results = Vec::new();
     queue.push_back(start_node);
 
     if include_start {
         let result = node_action(graph, None, start_node);
-        results.insert(start_node, result);
+        results.push(result);
     }
 
     while let Some(node) = queue.pop_front() {
@@ -443,7 +443,7 @@ where
 
             for (edge, neighbor) in neighbors {
                 let result = node_action(graph, Some(edge), neighbor);
-                results.insert(neighbor, result);
+                results.push(result);
                 if !visited.contains(&neighbor) {
                     queue.push_back(neighbor);
                 }
@@ -459,19 +459,19 @@ pub fn traverse_mut<'a, N, E, F, R>(
     start_node: NodeIndex,
     include_start: bool,
     mut node_action: F,
-) -> IndexMap<NodeIndex, R>
+) -> Vec<R>
 where
     F: FnMut(&mut Graph<N, E>, Option<EdgeIndex>, NodeIndex) -> R,
     E: std::cmp::PartialEq,
 {
     let mut queue = VecDeque::new();
     let mut visited = IndexSet::new();
-    let mut results = IndexMap::new();
+    let mut results = Vec::new();
     queue.push_back(start_node);
 
     if include_start {
         let result = node_action(graph, None, start_node);
-        results.insert(start_node, result);
+        results.push(result);
     }
 
     while let Some(node) = queue.pop_front() {
@@ -494,7 +494,7 @@ where
 
             for (edge, neighbor) in neighbors {
                 let result = node_action(graph, Some(edge), neighbor);
-                results.insert(neighbor, result);
+                results.push(result);
                 if !visited.contains(&neighbor) {
                     queue.push_back(neighbor);
                 }

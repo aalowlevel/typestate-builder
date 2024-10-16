@@ -38,7 +38,7 @@ pub struct Produce {
 pub fn run(graph: StructGraph, map: IndexMap<String, NodeIndex>) -> Produce {
     let mut res = Vec::new();
     if let Some(builder_states) = BuilderStates::run(&graph, &map) {
-        res.extend(builder_states.into_iter().map(|(_k, v)| v));
+        res.extend(builder_states);
     }
     Produce { graph, map, res }
 }
@@ -46,32 +46,25 @@ pub fn run(graph: StructGraph, map: IndexMap<String, NodeIndex>) -> Produce {
 struct BuilderStates;
 
 impl BuilderStates {
-    fn run(
-        graph: &StructGraph,
-        map: &IndexMap<String, NodeIndex>,
-    ) -> Option<IndexMap<NodeIndex, TokenStream2>> {
+    fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> Option<Vec<TokenStream2>> {
         let action = |graph: &StructGraph, _edge, field_node| -> TokenStream2 {
             let BuilderStatePair {
                 main_ident,
                 ident,
                 ty,
-                field_to_main_lifetimes,
-                field_to_main_consts,
-                field_to_main_types,
+                mut field_to_main_lifetimes,
+                mut field_to_main_consts,
+                mut field_to_main_types,
                 field_to_where_predicates,
             } = BuilderStatePair::new(graph, field_node, map);
 
             let ident_added = format_ident!("{}{}Added", main_ident, ident_to_titlecase(&ident));
             let ident_empty = format_ident!("{}{}Empty", main_ident, ident_to_titlecase(&ident));
 
-            let mut field_to_main_lifetimes = field_to_main_lifetimes.values().collect::<Vec<_>>();
-            let mut field_to_main_consts = field_to_main_consts.values().collect::<Vec<_>>();
-            let mut field_to_main_types = field_to_main_types.values().collect::<Vec<_>>();
-
             let mut where_predicates = Vec::new();
-            for (wp, wpgs) in field_to_where_predicates.values() {
+            for (wp, wpgs) in field_to_where_predicates {
                 where_predicates.push(wp);
-                for wpg in wpgs.values() {
+                for wpg in wpgs {
                     Self::compare_generic_params(
                         &mut field_to_main_lifetimes,
                         &mut field_to_main_types,
@@ -115,17 +108,17 @@ impl BuilderStates {
         })
     }
 
-    fn compare_generic_params<'a>(
-        field_to_main_lifetimes: &mut Vec<&'a Rc<syn::GenericParam>>,
-        field_to_main_types: &mut Vec<&Rc<syn::GenericParam>>,
-        field_to_main_consts: &mut Vec<&Rc<syn::GenericParam>>,
-        wpg: &'a Rc<syn::GenericParam>,
+    fn compare_generic_params(
+        field_to_main_lifetimes: &mut Vec<Rc<syn::GenericParam>>,
+        field_to_main_types: &mut Vec<Rc<syn::GenericParam>>,
+        field_to_main_consts: &mut Vec<Rc<syn::GenericParam>>,
+        wpg: Rc<syn::GenericParam>,
     ) {
         match wpg.as_ref() {
             syn::GenericParam::Lifetime(lifetime_param) => {
                 Self::compare_generic_params_lifetimes(
                     field_to_main_lifetimes,
-                    wpg,
+                    Rc::clone(&wpg),
                     lifetime_param,
                 );
             }
@@ -134,9 +127,9 @@ impl BuilderStates {
         }
     }
 
-    fn compare_generic_params_lifetimes<'a>(
-        field_to_main_lifetimes: &mut Vec<&'a Rc<syn::GenericParam>>,
-        wpg: &'a Rc<syn::GenericParam>,
+    fn compare_generic_params_lifetimes(
+        field_to_main_lifetimes: &mut Vec<Rc<syn::GenericParam>>,
+        wpg: Rc<syn::GenericParam>,
         lifetime_param: &syn::LifetimeParam,
     ) {
         let found = field_to_main_lifetimes.iter().any(|f| {
@@ -152,21 +145,15 @@ impl BuilderStates {
     }
 }
 
-type FieldToWherePredicates = IndexMap<
-    NodeIndex,
-    (
-        Rc<syn::WherePredicate>,
-        IndexMap<NodeIndex, Rc<syn::GenericParam>>,
-    ),
->;
+type FieldToWherePredicates = Vec<(Rc<syn::WherePredicate>, Vec<Rc<syn::GenericParam>>)>;
 
 struct BuilderStatePair<'a> {
     main_ident: &'a Ident,
     ident: Cow<'a, Ident>,
     ty: &'a Type,
-    field_to_main_lifetimes: IndexMap<NodeIndex, Rc<syn::GenericParam>>,
-    field_to_main_consts: IndexMap<NodeIndex, Rc<syn::GenericParam>>,
-    field_to_main_types: IndexMap<NodeIndex, Rc<syn::GenericParam>>,
+    field_to_main_lifetimes: Vec<Rc<syn::GenericParam>>,
+    field_to_main_consts: Vec<Rc<syn::GenericParam>>,
+    field_to_main_types: Vec<Rc<syn::GenericParam>>,
     field_to_where_predicates: FieldToWherePredicates,
 }
 
@@ -244,10 +231,7 @@ impl<'a> BuilderStatePair<'a> {
         graph: &StructGraph,
         _edge: Option<EdgeIndex>,
         wp_node: NodeIndex,
-    ) -> (
-        Rc<syn::WherePredicate>,
-        IndexMap<NodeIndex, Rc<syn::GenericParam>>,
-    ) {
+    ) -> (Rc<syn::WherePredicate>, Vec<Rc<syn::GenericParam>>) {
         let StructElement::WherePredicate(wp) = &graph[wp_node] else {
             panic!("Node must be a Where Predicate.");
         };
