@@ -6,7 +6,7 @@ use typestate_builder::TypestateBuilder;
 
 fn main() {}
 
-// #[derive(TypestateBuilder)]
+#[derive(TypestateBuilder)]
 struct AdvancedPhantomStruct<'a, T>
 where
     T: 'a + Clone,
@@ -14,11 +14,3 @@ where
     reference: &'a T,
     marker: PhantomData<T>,
 }
-struct AdvancedPhantomStructReferenceAdded<'a, T>(&'a T)
-where
-    T: 'a + Clone;
-struct AdvancedPhantomStructReferenceEmpty;
-struct AdvancedPhantomStructMarkerAdded<T>(PhantomData<T>)
-where
-    T: 'a + Clone;
-struct AdvancedPhantomStructMarkerEmpty;
