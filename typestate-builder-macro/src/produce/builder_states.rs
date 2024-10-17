@@ -8,7 +8,7 @@ use quote::{format_ident, quote};
 
 use crate::{
     graph::{traverse, StructElement, StructGraph, StructRelation, FIELD_START_P},
-    helper::{ident_to_titlecase, NODE_FIELD_MSG, NODE_GENERIC_MSG, NODE_WP_MSG},
+    helper::{to_titlecase, NODE_FIELD_MSG, NODE_GENERIC_MSG, NODE_WP_MSG},
 };
 
 pub(super) fn run(
@@ -28,8 +28,8 @@ pub(super) fn run(
         } = BuilderStatePair::new(graph, field_node, map);
 
         /* ✅ #TD93602268 Idents of pair. */
-        let ident_added = format_ident!("{}{}Added", main_ident, ident_to_titlecase(&ident));
-        let ident_empty = format_ident!("{}{}Empty", main_ident, ident_to_titlecase(&ident));
+        let ident_added = format_ident!("{}{}Added", main_ident, to_titlecase(&ident.to_string()));
+        let ident_empty = format_ident!("{}{}Empty", main_ident, to_titlecase(&ident.to_string()));
 
         /* ✅ #TD39331204 Create and push field generics. */
         let mut generics = Vec::new();

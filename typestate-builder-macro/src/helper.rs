@@ -56,9 +56,8 @@ pub fn write_graph_to_file<N: std::fmt::Debug, E: std::fmt::Debug>(
     Ok(())
 }
 
-pub fn ident_to_titlecase(syn: &syn::Ident) -> String {
-    let node_name = syn.to_string();
-    node_name
+pub fn to_titlecase(string: &str) -> String {
+    string
         .split('_')
         .map(|word| {
             let mut chars = word.chars();
