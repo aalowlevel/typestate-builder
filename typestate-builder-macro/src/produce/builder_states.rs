@@ -8,7 +8,7 @@ use quote::{format_ident, quote};
 
 use crate::{
     graph::{traverse, StructElement, StructGraph, StructRelation, FIELD_START_P},
-    helper::ident_to_titlecase,
+    helper::{ident_to_titlecase, NODE_FIELD_MSG, NODE_GENERIC_MSG, NODE_WP_MSG},
 };
 
 pub(super) fn run(
@@ -187,7 +187,7 @@ impl<'a> BuilderStatePair<'a> {
         map: &'a IndexMap<String, NodeIndex>,
     ) -> Self {
         let StructElement::Field(field) = &graph[field_node] else {
-            panic!("Node must be a field.");
+            panic!("{}", NODE_FIELD_MSG);
         };
         let Some(StructElement::Ident(main_ident)) = map.get("Ident").map(|f| &graph[*f]) else {
             panic!("Struct must have an ident.");
@@ -245,7 +245,7 @@ impl<'a> BuilderStatePair<'a> {
         generic_node: NodeIndex,
     ) -> Rc<syn::GenericParam> {
         let StructElement::Generic(generic) = &graph[generic_node] else {
-            panic!("Node must be a generic.");
+            panic!("{}", NODE_GENERIC_MSG);
         };
         Rc::clone(&generic.syn)
     }
@@ -256,7 +256,7 @@ impl<'a> BuilderStatePair<'a> {
         wp_node: NodeIndex,
     ) -> FieldToWherePredicate {
         let StructElement::WherePredicate(wp) = &graph[wp_node] else {
-            panic!("Node must be a Where Predicate.");
+            panic!("{}", NODE_WP_MSG);
         };
         let right_lifetimes_in_generics = traverse(
             graph,
@@ -293,7 +293,7 @@ impl<'a> BuilderStatePair<'a> {
         generic_node: NodeIndex,
     ) -> Rc<syn::GenericParam> {
         let StructElement::Generic(generic) = &graph[generic_node] else {
-            panic!("Node must be a generic.");
+            panic!("{}", NODE_GENERIC_MSG);
         };
         Rc::clone(&generic.syn)
     }

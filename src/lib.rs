@@ -69,7 +69,7 @@ In this example, the Person struct uses the `TypestateBuilder` derive macro to c
 
 - Final Assembly: The `build` method assembles the final struct once all required fields have been set, preventing the creation of incomplete instances.
 
-- Graph analysis: This crate internally analyzes the sub-elements of structures with graph and manages the relationships between them. Thus, the source of the final generated code is from this analysis.
+- Graph analysis: This crate internally analyzes the sub-elements of structures with graph and describes the relationships between them. Thus, the source of the final generated code is derived from this analysis.
 
 ## Code Expanded
 

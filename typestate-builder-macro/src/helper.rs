@@ -69,3 +69,7 @@ pub fn ident_to_titlecase(syn: &syn::Ident) -> String {
         })
         .collect()
 }
+
+pub const NODE_FIELD_MSG: &str = "Node must be a field.";
+pub const NODE_GENERIC_MSG: &str = "Node must be a generic.";
+pub const NODE_WP_MSG: &str = "Node must be a Where Predicate.";
