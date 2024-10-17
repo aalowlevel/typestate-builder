@@ -16,10 +16,7 @@ use petgraph::graph::NodeIndex;
 use syn::{GenericParam, WherePredicate};
 
 use crate::{
-    graph::{
-        traverse_mut, StructElement, StructGraph, StructRelation, FIELD_START_P, GENERICS_START_P,
-        WHERE_PREDICATE_START_P,
-    },
+    graph::{mapkey, msg, traverse_mut, StructElement, StructGraph, StructRelation},
     helper::extract_ident,
 };
 
@@ -29,7 +26,7 @@ pub fn run(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex>) {
 }
 
 fn bind_field_elements(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex>) {
-    if let Some(start) = map.get(FIELD_START_P) {
+    if let Some(start) = map.get(mapkey::startp::FIELD) {
         let action = |graph: &mut StructGraph, _edge, node_field| {
             list_field_assets(graph, node_field);
             traversal_field_to_generics(graph, node_field, map);
@@ -46,7 +43,7 @@ fn bind_field_elements(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex
 }
 
 fn bind_where_predicate_elements(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex>) {
-    if let Some(start) = map.get(WHERE_PREDICATE_START_P) {
+    if let Some(start) = map.get(mapkey::startp::WP) {
         let action = |graph: &mut StructGraph, _edge, node_wp| {
             list_wp_assets(graph, node_wp);
             traversal_wp_to_generics(graph, node_wp, map);
@@ -61,18 +58,15 @@ fn bind_where_predicate_elements(graph: &mut StructGraph, map: &IndexMap<String,
     }
 }
 
-const ONLY_FIELD_MSG: &str = "Only Field is accepted.";
-const ONLY_GENERIC_MSG: &str = "Only Generic is accepted.";
-const ONLY_WP_MSG: &str = "Only Where Predicate is accepted.";
 fn list_field_assets(graph: &mut StructGraph, node_field: NodeIndex) {
     let StructElement::Field(field) = &mut graph[node_field] else {
-        panic!("{}", ONLY_FIELD_MSG);
+        panic!("{}", msg::node::FIELD);
     };
     field.list();
 }
 fn list_wp_assets(graph: &mut StructGraph, wp_field: NodeIndex) {
     let StructElement::WherePredicate(wp) = &mut graph[wp_field] else {
-        panic!("{}", ONLY_WP_MSG);
+        panic!("{}", msg::node::WP);
     };
     let (
         left_bound_lifetimes,
@@ -94,7 +88,7 @@ fn traversal_field_to_generics(
     node_field: NodeIndex,
     map: &IndexMap<String, NodeIndex>,
 ) {
-    if let Some(start) = map.get(GENERICS_START_P) {
+    if let Some(start) = map.get(mapkey::startp::GENERICS) {
         let action = |graph: &mut StructGraph, _edge, node_generic| {
             search_in_generics_by_field(graph, node_field, node_generic);
         };
@@ -114,7 +108,7 @@ fn search_in_generics_by_field(
     node_generic: NodeIndex,
 ) {
     let StructElement::Generic(generic) = &graph[node_generic] else {
-        panic!("{}", ONLY_GENERIC_MSG);
+        panic!("{}", msg::node::GENERIC);
     };
     let generic_ident = match generic.syn.as_ref() {
         GenericParam::Lifetime(lifetime_param) => &lifetime_param.lifetime.ident,
@@ -122,7 +116,7 @@ fn search_in_generics_by_field(
         GenericParam::Const(const_param) => &const_param.ident,
     };
     let StructElement::Field(field) = &graph[node_field] else {
-        panic!("{}", ONLY_FIELD_MSG);
+        panic!("{}", msg::node::FIELD);
     };
     let type_found = field
         .types
@@ -165,7 +159,7 @@ fn traversal_field_to_where_clause(
     node_field: NodeIndex,
     map: &IndexMap<String, NodeIndex>,
 ) {
-    if let Some(start) = map.get(WHERE_PREDICATE_START_P) {
+    if let Some(start) = map.get(mapkey::startp::WP) {
         let action = |graph: &mut StructGraph, _edge, node_wp| {
             search_in_wp_by_field(graph, node_field, node_wp);
         };
@@ -182,7 +176,7 @@ fn traversal_field_to_where_clause(
 /** Checks whether any element in the field is defined in where clause of the generics. If it is defined, establishes a connection. */
 fn search_in_wp_by_field(graph: &mut StructGraph, node_field: NodeIndex, node_wp: NodeIndex) {
     let StructElement::WherePredicate(wp) = &graph[node_wp] else {
-        panic!("{}", ONLY_WP_MSG);
+        panic!("{}", msg::node::WP);
     };
     let wp_ident = match wp.syn.as_ref() {
         WherePredicate::Lifetime(predicate_lifetime) => Some(&predicate_lifetime.lifetime.ident),
@@ -190,7 +184,7 @@ fn search_in_wp_by_field(graph: &mut StructGraph, node_field: NodeIndex, node_wp
         _ => None,
     };
     let StructElement::Field(field) = &graph[node_field] else {
-        panic!("{}", ONLY_FIELD_MSG);
+        panic!("{}", msg::node::FIELD);
     };
     let found = field
         .types
@@ -217,7 +211,7 @@ fn traversal_wp_to_generics(
     node_wp: NodeIndex,
     map: &IndexMap<String, NodeIndex>,
 ) {
-    if let Some(start) = map.get(GENERICS_START_P) {
+    if let Some(start) = map.get(mapkey::startp::GENERICS) {
         let action = |graph: &mut StructGraph, _edge, node_generic| {
             search_in_generics_by_wp(graph, node_wp, node_generic);
         };
@@ -233,10 +227,10 @@ fn traversal_wp_to_generics(
 }
 fn search_in_generics_by_wp(graph: &mut StructGraph, node_wp: NodeIndex, node_generic: NodeIndex) {
     let StructElement::Generic(generic) = &graph[node_generic] else {
-        panic!("{}", ONLY_GENERIC_MSG);
+        panic!("{}", msg::node::GENERIC);
     };
     let StructElement::WherePredicate(wp) = &graph[node_wp] else {
-        panic!("{}", ONLY_WP_MSG);
+        panic!("{}", msg::node::WP);
     };
     match generic.syn.as_ref() {
         GenericParam::Lifetime(lifetime_param) => {

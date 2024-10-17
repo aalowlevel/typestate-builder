@@ -11,12 +11,6 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-mod builder;
-mod builder_build_impl;
-mod builder_impl;
-mod builder_new_impl;
-mod builder_states;
-
 use indexmap::IndexMap;
 use petgraph::graph::NodeIndex;
 use proc_macro2::TokenStream as TokenStream2;
@@ -25,14 +19,101 @@ use crate::graph::StructGraph;
 
 pub fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> Vec<TokenStream2> {
     let mut res = Vec::new();
-    if let Some(builder_states) = builder_states::run(&graph, &map) {
-        res.extend(builder_states);
-    }
-    if let Some(builder) = builder::run(&graph, &map) {
+    if let Some(builder) = builder::run(graph, map) {
         res.push(builder);
     }
-    if let Some(builder_build_impl) = builder_build_impl::run(&graph, &map) {
-        res.push(builder_build_impl);
-    }
+    // if let Some(builder_states) = builder_states::run(&graph, &map) {
+    //     res.extend(builder_states);
+    // }
+    // if let Some(builder_build_impl) = builder_build_impl::run(&graph, &map) {
+    //     res.push(builder_build_impl);
+    // }
     res
+}
+
+mod builder {
+    use indexmap::IndexMap;
+    use petgraph::graph::NodeIndex;
+    use proc_macro2::TokenStream as TokenStream2;
+    use quote::quote;
+
+    use crate::graph::{mapkey, msg, StructElement, StructGraph};
+
+    pub(super) fn run(
+        graph: &StructGraph,
+        map: &IndexMap<String, NodeIndex>,
+    ) -> Option<TokenStream2> {
+        let Some(ix) = map.get(mapkey::uniq::BUILDER_IDENT) else {
+            panic!("{}", msg::ix::BUILDER_IDENT);
+        };
+        let StructElement::BuilderIdent(ident) = &graph[*ix] else {
+            panic!("{}", msg::node::IDENT);
+        };
+
+        Some(quote! {})
+    }
+}
+
+mod builder_states {
+    use indexmap::IndexMap;
+    use petgraph::graph::NodeIndex;
+    use proc_macro2::TokenStream as TokenStream2;
+    use quote::quote;
+
+    use crate::graph::StructGraph;
+
+    pub(super) fn run(
+        graph: &StructGraph,
+        map: &IndexMap<String, NodeIndex>,
+    ) -> Option<TokenStream2> {
+        Some(quote! {})
+    }
+}
+
+mod builder_build_impl {
+    use indexmap::IndexMap;
+    use petgraph::graph::NodeIndex;
+    use proc_macro2::TokenStream as TokenStream2;
+    use quote::quote;
+
+    use crate::graph::StructGraph;
+
+    pub(super) fn run(
+        graph: &StructGraph,
+        map: &IndexMap<String, NodeIndex>,
+    ) -> Option<TokenStream2> {
+        Some(quote! {})
+    }
+}
+
+mod builder_impl {
+    use indexmap::IndexMap;
+    use petgraph::graph::NodeIndex;
+    use proc_macro2::TokenStream as TokenStream2;
+    use quote::quote;
+
+    use crate::graph::StructGraph;
+
+    pub(super) fn run(
+        graph: &StructGraph,
+        map: &IndexMap<String, NodeIndex>,
+    ) -> Option<TokenStream2> {
+        Some(quote! {})
+    }
+}
+
+mod builder_new_impl {
+    use indexmap::IndexMap;
+    use petgraph::graph::NodeIndex;
+    use proc_macro2::TokenStream as TokenStream2;
+    use quote::quote;
+
+    use crate::graph::StructGraph;
+
+    pub(super) fn run(
+        graph: &StructGraph,
+        map: &IndexMap<String, NodeIndex>,
+    ) -> Option<TokenStream2> {
+        Some(quote! {})
+    }
 }

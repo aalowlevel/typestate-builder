@@ -48,8 +48,8 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
 
     let (mut graph, mut map) = parse::run(input);
     analyze::run(&mut graph, &map);
-    let res = produce::run(&graph, &map);
     analyze2::run(&mut graph, &mut map);
+    let res = produce::run(&graph, &map);
 
     // Combine the generated code into a final token stream.
     let output = quote! {

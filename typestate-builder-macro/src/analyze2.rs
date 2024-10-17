@@ -20,12 +20,10 @@ use quote::format_ident;
 
 use crate::{
     graph::{
-        traverse, traverse_mut, BuilderStateAdded, StructElement, StructGraph, StructRelation,
-        BUILDER_IDENT, FIELD_START_P, IDENT,
+        mapkey, msg, traverse, traverse_mut, BuilderStateAdded, StructElement, StructGraph,
+        StructRelation,
     },
-    helper::{
-        to_titlecase, IX_IDENT_MSG, NODE_FIELD_MSG, NODE_GENERIC_MSG, NODE_IDENT_MSG, NODE_WP_MSG,
-    },
+    helper::to_titlecase,
 };
 
 pub fn run(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>) {
@@ -35,21 +33,21 @@ pub fn run(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>) {
 
 fn create_builder(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>) {
     /* ✅ #TD10362896 Create builder. */
-    let Some(ix) = map.get(IDENT) else {
-        panic!("{}", IX_IDENT_MSG);
+    let Some(ix) = map.get(mapkey::uniq::IDENT) else {
+        panic!("{}", msg::ix::IDENT);
     };
     let StructElement::Ident(ident) = &graph[*ix] else {
-        panic!("{}", NODE_IDENT_MSG);
+        panic!("{}", msg::node::IDENT);
     };
     let ident = format_ident!("{}Builder", ident);
     let ix_builder = graph.add_node(StructElement::BuilderIdent(ident));
-    map.insert(BUILDER_IDENT.to_string(), ix_builder);
+    map.insert(mapkey::uniq::BUILDER_IDENT.to_string(), ix_builder);
 
-    if let Some(ix) = map.get(FIELD_START_P) {
+    if let Some(ix) = map.get(mapkey::startp::FIELD) {
         /* ✅ #TD92175615 Traverse on field train. */
         let action = |graph: &StructGraph, _edge, field_node| {
             let StructElement::Field(field) = &graph[field_node] else {
-                panic!("{}", NODE_FIELD_MSG);
+                panic!("{}", msg::node::FIELD);
             };
             let ident_str = field
                 .syn
@@ -117,7 +115,7 @@ fn create_builder(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>
 
 fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>) {
     /* ✅ #TD44491595 Traverse on field train. */
-    if let Some(start) = map.get(FIELD_START_P) {
+    if let Some(start) = map.get(mapkey::startp::FIELD) {
         let action = |graph: &mut StructGraph, _edge, field_node| {
             /* ✅ #TD78515467 All data to create two-legged state structs. */
             let BuilderStatePair {
@@ -297,7 +295,7 @@ impl<'a> BuilderStatePair<'a> {
         map: &'a IndexMap<String, NodeIndex>,
     ) -> Self {
         let StructElement::Field(field) = &graph[field_node] else {
-            panic!("{}", NODE_FIELD_MSG);
+            panic!("{}", msg::node::FIELD);
         };
         let Some(StructElement::Ident(main_ident)) = map.get("Ident").map(|f| &graph[*f]) else {
             panic!("Struct must have an ident.");
@@ -355,7 +353,7 @@ impl<'a> BuilderStatePair<'a> {
         generic_node: NodeIndex,
     ) -> Rc<syn::GenericParam> {
         let StructElement::Generic(generic) = &graph[generic_node] else {
-            panic!("{}", NODE_GENERIC_MSG);
+            panic!("{}", msg::node::GENERIC);
         };
         Rc::clone(&generic.syn)
     }
@@ -366,7 +364,7 @@ impl<'a> BuilderStatePair<'a> {
         wp_node: NodeIndex,
     ) -> FieldToWherePredicate {
         let StructElement::WherePredicate(wp) = &graph[wp_node] else {
-            panic!("{}", NODE_WP_MSG);
+            panic!("{}", msg::node::WP);
         };
         let right_lifetimes_in_generics = traverse(
             graph,
@@ -403,7 +401,7 @@ impl<'a> BuilderStatePair<'a> {
         generic_node: NodeIndex,
     ) -> Rc<syn::GenericParam> {
         let StructElement::Generic(generic) = &graph[generic_node] else {
-            panic!("{}", NODE_GENERIC_MSG);
+            panic!("{}", msg::node::GENERIC);
         };
         Rc::clone(&generic.syn)
     }

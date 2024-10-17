@@ -68,11 +68,3 @@ pub fn to_titlecase(string: &str) -> String {
         })
         .collect()
 }
-
-pub const IX_IDENT_MSG: &str = "There must be ident node.";
-pub const NODE_VIS_MSG: &str = "Node must be a visibility.";
-pub const NODE_IDENT_MSG: &str = "Node must be an ident.";
-pub const NODE_TYPE_MSG: &str = "Node must be a type.";
-pub const NODE_FIELD_MSG: &str = "Node must be a field.";
-pub const NODE_GENERIC_MSG: &str = "Node must be a generic.";
-pub const NODE_WP_MSG: &str = "Node must be a Where Predicate.";

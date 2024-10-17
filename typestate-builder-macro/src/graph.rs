@@ -22,14 +22,36 @@ use quote::ToTokens;
 use serde::{ser::SerializeStruct, Serialize};
 use serde_json::json;
 
-pub const VIS: &str = "Visibility";
-pub const IDENT: &str = "Ident";
-pub const TYPE: &str = "Type";
-pub const FIELD_START_P: &str = "Field0";
-pub const GENERICS_START_P: &str = "Generic0";
-pub const WHERE_PREDICATE_START_P: &str = "WherePredicate0";
-pub const BUILDER_IDENT: &str = "BuilderIdent";
-pub const BUILDER_FIELD_START_P: &str = "BuilderField0";
+pub mod mapkey {
+    pub mod startp {
+        pub const FIELD: &str = "Field0";
+        pub const GENERICS: &str = "Generic0";
+        pub const WP: &str = "WherePredicate0";
+        pub const BUILDER_FIELD: &str = "BuilderField0";
+    }
+    pub mod uniq {
+        pub const VIS: &str = "Visibility";
+        pub const IDENT: &str = "Ident";
+        pub const TYPE: &str = "Type";
+        pub const BUILDER_IDENT: &str = "BuilderIdent";
+    }
+}
+
+pub mod msg {
+    pub mod ix {
+        pub const IDENT: &str = "There must be ident node.";
+        pub const BUILDER_IDENT: &str = "There must be builder ident node.";
+    }
+    pub mod node {
+        pub const VIS: &str = "Node must be a visibility.";
+        pub const IDENT: &str = "Node must be an ident.";
+        pub const TYPE: &str = "Node must be a type.";
+        pub const FIELD: &str = "Node must be a field.";
+        pub const GENERIC: &str = "Node must be a generic.";
+        pub const WP: &str = "Node must be a Where Predicate.";
+        pub const BUILDER_IDENT: &str = "Node must be a builder ident.";
+    }
+}
 
 pub enum StructElement {
     Visibility(syn::Visibility),

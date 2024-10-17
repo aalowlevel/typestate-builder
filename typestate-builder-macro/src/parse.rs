@@ -14,7 +14,7 @@
 use std::rc::Rc;
 
 use crate::{
-    graph::{Field, GenericParam, StructGraph, StructType, WherePredicate, IDENT, TYPE, VIS},
+    graph::{mapkey, Field, GenericParam, StructGraph, StructType, WherePredicate},
     StructElement, StructRelation,
 };
 
@@ -49,9 +49,9 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
     // Beginning
     {
         let ix = graph.add_node(StructElement::Visibility(input.vis));
-        map.insert(VIS.to_string(), ix);
+        map.insert(mapkey::uniq::VIS.to_string(), ix);
         let ix = graph.add_node(StructElement::Ident(input.ident));
-        map.insert(IDENT.to_string(), ix);
+        map.insert(mapkey::uniq::IDENT.to_string(), ix);
     }
 
     add_from_list!(graph, map, input.attrs, Attribute, AttributeTrain);
@@ -95,7 +95,7 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
     match data_struct.fields {
         Fields::Named(fields_named) => {
             let ix = graph.add_node(StructElement::Type(StructType::Named));
-            map.insert(TYPE.to_string(), ix);
+            map.insert(mapkey::uniq::TYPE.to_string(), ix);
 
             let fields = fields_named
                 .named
@@ -113,7 +113,7 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
         }
         Fields::Unnamed(fields_unnamed) => {
             let ix = graph.add_node(StructElement::Type(StructType::Unnamed));
-            map.insert(TYPE.to_string(), ix);
+            map.insert(mapkey::uniq::TYPE.to_string(), ix);
 
             let fields = fields_unnamed
                 .unnamed
@@ -131,7 +131,7 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
         }
         Fields::Unit => {
             let ix = graph.add_node(StructElement::Type(StructType::Unit));
-            map.insert(TYPE.to_string(), ix);
+            map.insert(mapkey::uniq::TYPE.to_string(), ix);
         }
     }
 
