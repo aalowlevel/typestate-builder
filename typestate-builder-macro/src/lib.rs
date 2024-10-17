@@ -19,6 +19,7 @@
 #![warn(missing_docs)]
 
 mod analyze;
+mod analyze2;
 mod graph;
 mod helper;
 mod parse;
@@ -45,10 +46,10 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     // Parse the input token stream into a `DeriveInput` structure.
     let input = parse_macro_input!(input as DeriveInput);
 
-    // Firstly, we need to parse input data.
-    let (mut graph, map) = parse::run(input);
+    let (mut graph, mut map) = parse::run(input);
     analyze::run(&mut graph, &map);
-    let produce::Produce { graph, res } = produce::run(graph, map);
+    let res = produce::run(&graph, &map);
+    analyze2::run(&mut graph, &mut map);
 
     // Combine the generated code into a final token stream.
     let output = quote! {

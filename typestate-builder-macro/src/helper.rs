@@ -69,6 +69,7 @@ pub fn to_titlecase(string: &str) -> String {
         .collect()
 }
 
+pub const IX_IDENT_MSG: &str = "There must be ident node.";
 pub const NODE_VIS_MSG: &str = "Node must be a visibility.";
 pub const NODE_IDENT_MSG: &str = "Node must be an ident.";
 pub const NODE_TYPE_MSG: &str = "Node must be a type.";

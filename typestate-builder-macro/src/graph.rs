@@ -28,6 +28,8 @@ pub const TYPE: &str = "Type";
 pub const FIELD_START_P: &str = "Field0";
 pub const GENERICS_START_P: &str = "Generic0";
 pub const WHERE_PREDICATE_START_P: &str = "WherePredicate0";
+pub const BUILDER_IDENT: &str = "BuilderIdent";
+pub const BUILDER_FIELD_START_P: &str = "BuilderField0";
 
 pub enum StructElement {
     Visibility(syn::Visibility),
@@ -37,6 +39,11 @@ pub enum StructElement {
     WherePredicate(WherePredicate),
     Field(Field),
     Type(StructType),
+    BuilderStateEmpty(syn::Ident),
+    BuilderStateAdded(BuilderStateAdded),
+    BuilderIdent(syn::Ident),
+    BuilderField(syn::Ident),
+    BuilderGeneric(syn::Ident),
 }
 
 impl Serialize for StructElement {
@@ -78,6 +85,37 @@ impl Serialize for StructElement {
             StructElement::Type(struct_type) => {
                 serializer.serialize_newtype_variant("StructElement", 0, "Type", &struct_type)
             }
+            StructElement::BuilderStateEmpty(ident) => serializer.serialize_newtype_variant(
+                "StructElement",
+                0,
+                "BuilderStateEmpty",
+                &json!(ident.to_string()),
+            ),
+            StructElement::BuilderStateAdded(builder_state_added) => serializer
+                .serialize_newtype_variant(
+                    "StructElement",
+                    0,
+                    "BuilderStateEmpty",
+                    &builder_state_added,
+                ),
+            StructElement::BuilderIdent(ident) => serializer.serialize_newtype_variant(
+                "StructElement",
+                0,
+                "BuilderIdent",
+                &json!(ident.to_string()),
+            ),
+            StructElement::BuilderField(ident) => serializer.serialize_newtype_variant(
+                "StructElement",
+                0,
+                "BuilderField",
+                &json!(ident.to_string()),
+            ),
+            StructElement::BuilderGeneric(ident) => serializer.serialize_newtype_variant(
+                "StructElement",
+                0,
+                "BuilderGeneric",
+                &json!(ident.to_string()),
+            ),
         }
     }
 }
@@ -114,6 +152,10 @@ pub enum StructRelation {
     WPRightBoundingTypeInMain,
     WPRightBoundingTypePhantomInMain,
     WPRightBoundingLifetimeInMain,
+    FieldToBuilderState,
+    BuilderStatePair,
+    BuilderFieldTrain,
+    BuilderGenericTrain,
 }
 
 pub type StructGraph = Graph<StructElement, StructRelation>;
@@ -484,6 +526,10 @@ impl Serialize for WherePredicate {
         res.end()
     }
 }
+
+#[derive(Serialize)]
+pub struct BuilderStateAdded {}
+
 pub fn traverse<'a, N, E, F, R>(
     graph: &'a Graph<N, E>,
     filter_edge: Option<&'a [&'a E]>,

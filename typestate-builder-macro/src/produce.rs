@@ -23,12 +23,7 @@ use proc_macro2::TokenStream as TokenStream2;
 
 use crate::graph::StructGraph;
 
-pub struct Produce {
-    pub graph: StructGraph,
-    pub res: Vec<TokenStream2>,
-}
-
-pub fn run(graph: StructGraph, map: IndexMap<String, NodeIndex>) -> Produce {
+pub fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> Vec<TokenStream2> {
     let mut res = Vec::new();
     if let Some(builder_states) = builder_states::run(&graph, &map) {
         res.extend(builder_states);
@@ -36,5 +31,8 @@ pub fn run(graph: StructGraph, map: IndexMap<String, NodeIndex>) -> Produce {
     if let Some(builder) = builder::run(&graph, &map) {
         res.push(builder);
     }
-    Produce { graph, res }
+    if let Some(builder_build_impl) = builder_build_impl::run(&graph, &map) {
+        res.push(builder_build_impl);
+    }
+    res
 }
