@@ -348,42 +348,7 @@ impl WherePredicate {
                 let left_bounded_type = Some(bounded_ty.clone());
 
                 let (right_bounding_types, right_bounding_lifetimes, right_bounding_phantoms) =
-                    bounds.iter().fold(
-                        (Vec::new(), Vec::new(), Vec::new()),
-                        |(mut types, mut lifetimes, mut phantoms), bound| {
-                            match bound {
-                                syn::TypeParamBound::Trait(trait_bound) => {
-                                    if let Some(segment) = trait_bound.path.segments.first() {
-                                        if segment.ident == "Fn"
-                                            || segment.ident == "FnMut"
-                                            || segment.ident == "FnOnce"
-                                        {
-                                            if let syn::PathArguments::Parenthesized(args) =
-                                                &segment.arguments
-                                            {
-                                                for arg in args.inputs.iter() {
-                                                    phantoms.push(arg.clone());
-                                                }
-                                                if let syn::ReturnType::Type(_, ty) = &args.output {
-                                                    phantoms.push(*(ty.clone()));
-                                                }
-                                            }
-                                        } else {
-                                            types.push(syn::Type::Path(syn::TypePath {
-                                                qself: None,
-                                                path: trait_bound.path.clone(),
-                                            }));
-                                        }
-                                    }
-                                }
-                                syn::TypeParamBound::Lifetime(lifetime) => {
-                                    lifetimes.push(lifetime.clone());
-                                }
-                                _ => {}
-                            }
-                            (types, lifetimes, phantoms)
-                        },
-                    );
+                    Self::process_bounds(bounds);
 
                 (
                     left_bound_lifetimes,
@@ -415,6 +380,81 @@ impl WherePredicate {
                 None,
             ),
             _ => (None, None, None, None, None, None),
+        }
+    }
+
+    fn process_bounds(
+        bounds: &syn::punctuated::Punctuated<syn::TypeParamBound, syn::token::Plus>,
+    ) -> (Vec<syn::Type>, Vec<syn::Lifetime>, Vec<syn::Type>) {
+        bounds.iter().fold(
+            (Vec::new(), Vec::new(), Vec::new()),
+            |(mut types, mut lifetimes, mut phantoms), bound| {
+                match bound {
+                    syn::TypeParamBound::Trait(trait_bound) => {
+                        Self::process_trait_bound(trait_bound, &mut types, &mut phantoms);
+                    }
+                    syn::TypeParamBound::Lifetime(lifetime) => {
+                        lifetimes.push(lifetime.clone());
+                    }
+                    _ => {}
+                }
+                (types, lifetimes, phantoms)
+            },
+        )
+    }
+
+    fn process_trait_bound(
+        trait_bound: &syn::TraitBound,
+        types: &mut Vec<syn::Type>,
+        phantoms: &mut Vec<syn::Type>,
+    ) {
+        if let Some(segment) = trait_bound.path.segments.last() {
+            if segment.ident == "Fn" || segment.ident == "FnMut" || segment.ident == "FnOnce" {
+                if let syn::PathArguments::Parenthesized(args) = &segment.arguments {
+                    for arg in args.inputs.iter() {
+                        phantoms.push(arg.clone());
+                    }
+                    if let syn::ReturnType::Type(_, ty) = &args.output {
+                        phantoms.push((**ty).clone());
+                    }
+                }
+            } else {
+                types.push(syn::Type::Path(syn::TypePath {
+                    qself: None,
+                    path: trait_bound.path.clone(),
+                }));
+                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                    for arg in args.args.iter() {
+                        match arg {
+                            syn::GenericArgument::Type(ty) => {
+                                Self::process_type(ty, types, phantoms);
+                            }
+                            syn::GenericArgument::Lifetime(_lt) => {
+                                // We don't add lifetimes here as they're handled separately
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn process_type(ty: &syn::Type, _types: &mut Vec<syn::Type>, phantoms: &mut Vec<syn::Type>) {
+        match ty {
+            syn::Type::Path(type_path) => {
+                if let Some(segment) = type_path.path.segments.last() {
+                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                        for arg in args.args.iter() {
+                            if let syn::GenericArgument::Type(inner_ty) = arg {
+                                Self::process_type(inner_ty, _types, phantoms);
+                            }
+                        }
+                    }
+                }
+                phantoms.push(ty.clone());
+            }
+            _ => phantoms.push(ty.clone()),
         }
     }
 }

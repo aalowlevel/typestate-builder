@@ -5,10 +5,11 @@ use typestate_builder::TypestateBuilder;
 fn main() {}
 
 #[derive(TypestateBuilder)]
-struct StructWithFunctionPointer<T, F>
+struct NestedGenerics<'a, T, U>
 where
-    F: Fn(T) -> T,
+    T: 'a + Copy + Clone,
+    U: 'a + AsRef<T> + Clone,
 {
-    func: F,
-    value: T,
+    value: &'a T,
+    ref_container: U,
 }

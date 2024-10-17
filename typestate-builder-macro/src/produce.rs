@@ -21,7 +21,6 @@ mod builder_states;
 
 pub struct Produce {
     pub graph: StructGraph,
-    pub map: IndexMap<String, NodeIndex>,
     pub res: Vec<TokenStream2>,
 }
 
@@ -30,7 +29,7 @@ pub fn run(graph: StructGraph, map: IndexMap<String, NodeIndex>) -> Produce {
     if let Some(builder_states) = builder_states::run(&graph, &map) {
         res.extend(builder_states);
     }
-    Produce { graph, map, res }
+    Produce { graph, res }
 }
 
 struct Builder {}

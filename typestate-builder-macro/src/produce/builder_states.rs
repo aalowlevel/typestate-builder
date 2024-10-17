@@ -89,23 +89,25 @@ pub(super) fn run(
             }
 
             /* 🌀 COMPLEXITY #CP34264506 Using phantoms is needed some sub generic parameters. Add type parameters in the main generics and in the tuple as phantom data. */
-            let filter = field_to_where_predicate
-                .right_types_phantoms_in_generics
-                .into_iter()
-                .filter(|p0| {
-                    !field_to_main_types
-                        .iter()
-                        .any(|p1| compare_generic_params(p0, p1))
-                })
-                .collect::<Vec<_>>();
-            let filter_phantoms = filter
-                .iter()
-                .map(|f| {
-                    quote! { std::marker::PhantomData<#f> }
-                })
-                .collect::<Vec<_>>();
-            phantoms.extend(filter_phantoms);
-            generics_additions.extend(filter);
+            {
+                let filter = field_to_where_predicate
+                    .right_types_phantoms_in_generics
+                    .into_iter()
+                    .filter(|p0| {
+                        !field_to_main_types
+                            .iter()
+                            .any(|p1| compare_generic_params(p0, p1))
+                    })
+                    .collect::<Vec<_>>();
+                let filter_phantoms = filter
+                    .iter()
+                    .map(|f| {
+                        quote! { std::marker::PhantomData<#f> }
+                    })
+                    .collect::<Vec<_>>();
+                phantoms.extend(filter_phantoms);
+                generics_additions.extend(filter);
+            }
 
             /* ✅ #TD60868169 Finally push produced predicate. */
             where_predicates.push(predicate);
