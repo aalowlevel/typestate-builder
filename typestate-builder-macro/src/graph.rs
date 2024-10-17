@@ -22,6 +22,9 @@ use quote::ToTokens;
 use serde::{ser::SerializeStruct, Serialize};
 use serde_json::json;
 
+pub const VIS: &str = "Visibility";
+pub const IDENT: &str = "Ident";
+pub const TYPE: &str = "Type";
 pub const FIELD_START_P: &str = "Field0";
 pub const GENERICS_START_P: &str = "Generic0";
 pub const WHERE_PREDICATE_START_P: &str = "WherePredicate0";
@@ -33,6 +36,7 @@ pub enum StructElement {
     Generic(GenericParam),
     WherePredicate(WherePredicate),
     Field(Field),
+    Type(StructType),
 }
 
 impl Serialize for StructElement {
@@ -71,6 +75,9 @@ impl Serialize for StructElement {
             StructElement::Field(field) => {
                 serializer.serialize_newtype_variant("StructElement", 0, "Field", &field)
             }
+            StructElement::Type(struct_type) => {
+                serializer.serialize_newtype_variant("StructElement", 0, "Type", &struct_type)
+            }
         }
     }
 }
@@ -83,6 +90,13 @@ impl std::fmt::Debug for StructElement {
             serde_json::to_string(self).expect("serialize to string pretty")
         )
     }
+}
+
+#[derive(Serialize)]
+pub enum StructType {
+    Named,
+    Unnamed,
+    Unit,
 }
 
 #[derive(Debug, PartialEq)]

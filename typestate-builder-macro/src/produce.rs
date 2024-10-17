@@ -33,5 +33,8 @@ pub fn run(graph: StructGraph, map: IndexMap<String, NodeIndex>) -> Produce {
     if let Some(builder_states) = builder_states::run(&graph, &map) {
         res.extend(builder_states);
     }
+    if let Some(builder) = builder::run(&graph, &map) {
+        res.push(builder);
+    }
     Produce { graph, res }
 }
