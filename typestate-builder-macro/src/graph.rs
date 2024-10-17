@@ -98,6 +98,7 @@ pub enum StructRelation {
     WPLeftBoundedTypeInMain,
     WPLeftBoundedLifetimeInMain,
     WPRightBoundingTypeInMain,
+    WPRightBoundingTypePhantomInMain,
     WPRightBoundingLifetimeInMain,
 }
 
@@ -311,6 +312,7 @@ pub struct WherePredicate {
     pub left_bounded_lifetime: Option<syn::Lifetime>,
     pub right_bounding_types: Option<Vec<syn::Type>>,
     pub right_bounding_lifetimes: Option<Vec<syn::Lifetime>>,
+    pub right_bounding_phantoms: Option<Vec<syn::Type>>,
 }
 pub type WherePredicateInner = (
     Option<Vec<syn::Lifetime>>,
@@ -318,6 +320,7 @@ pub type WherePredicateInner = (
     Option<syn::Lifetime>,
     Option<Vec<syn::Type>>,
     Option<Vec<syn::Lifetime>>,
+    Option<Vec<syn::Type>>,
 );
 
 impl WherePredicate {
@@ -344,42 +347,43 @@ impl WherePredicate {
 
                 let left_bounded_type = Some(bounded_ty.clone());
 
-                let (right_bounding_types, right_bounding_lifetimes) = bounds.iter().fold(
-                    (Vec::new(), Vec::new()),
-                    |(mut types, mut lifetimes), bound| {
-                        match bound {
-                            syn::TypeParamBound::Trait(trait_bound) => {
-                                if let Some(segment) = trait_bound.path.segments.first() {
-                                    if segment.ident == "Fn"
-                                        || segment.ident == "FnMut"
-                                        || segment.ident == "FnOnce"
-                                    {
-                                        if let syn::PathArguments::Parenthesized(args) =
-                                            &segment.arguments
+                let (right_bounding_types, right_bounding_lifetimes, right_bounding_phantoms) =
+                    bounds.iter().fold(
+                        (Vec::new(), Vec::new(), Vec::new()),
+                        |(mut types, mut lifetimes, mut phantoms), bound| {
+                            match bound {
+                                syn::TypeParamBound::Trait(trait_bound) => {
+                                    if let Some(segment) = trait_bound.path.segments.first() {
+                                        if segment.ident == "Fn"
+                                            || segment.ident == "FnMut"
+                                            || segment.ident == "FnOnce"
                                         {
-                                            for arg in args.inputs.iter() {
-                                                types.push(arg.clone());
+                                            if let syn::PathArguments::Parenthesized(args) =
+                                                &segment.arguments
+                                            {
+                                                for arg in args.inputs.iter() {
+                                                    phantoms.push(arg.clone());
+                                                }
+                                                if let syn::ReturnType::Type(_, ty) = &args.output {
+                                                    phantoms.push(*(ty.clone()));
+                                                }
                                             }
-                                            if let syn::ReturnType::Type(_, ty) = &args.output {
-                                                types.push(*(ty.clone()));
-                                            }
+                                        } else {
+                                            types.push(syn::Type::Path(syn::TypePath {
+                                                qself: None,
+                                                path: trait_bound.path.clone(),
+                                            }));
                                         }
-                                    } else {
-                                        types.push(syn::Type::Path(syn::TypePath {
-                                            qself: None,
-                                            path: trait_bound.path.clone(),
-                                        }));
                                     }
                                 }
+                                syn::TypeParamBound::Lifetime(lifetime) => {
+                                    lifetimes.push(lifetime.clone());
+                                }
+                                _ => {}
                             }
-                            syn::TypeParamBound::Lifetime(lifetime) => {
-                                lifetimes.push(lifetime.clone());
-                            }
-                            _ => {}
-                        }
-                        (types, lifetimes)
-                    },
-                );
+                            (types, lifetimes, phantoms)
+                        },
+                    );
 
                 (
                     left_bound_lifetimes,
@@ -395,6 +399,11 @@ impl WherePredicate {
                     } else {
                         Some(right_bounding_lifetimes)
                     },
+                    if right_bounding_phantoms.is_empty() {
+                        None
+                    } else {
+                        Some(right_bounding_phantoms)
+                    },
                 )
             }
             syn::WherePredicate::Lifetime(predicate_lifetime) => (
@@ -403,8 +412,9 @@ impl WherePredicate {
                 Some(predicate_lifetime.lifetime.clone()),
                 None,
                 Some(predicate_lifetime.bounds.iter().cloned().collect()),
+                None,
             ),
-            _ => (None, None, None, None, None),
+            _ => (None, None, None, None, None, None),
         }
     }
 }

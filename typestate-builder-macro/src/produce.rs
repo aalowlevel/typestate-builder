@@ -48,7 +48,7 @@ struct BuilderStates;
 impl BuilderStates {
     fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> Option<Vec<TokenStream2>> {
         let action = |graph: &StructGraph, _edge, field_node| -> TokenStream2 {
-            // All data to crate two-legged state structs.
+            /* ✅ #TD78515467 All data to crate two-legged state structs. */
             let BuilderStatePair {
                 main_ident,
                 ident,
@@ -59,7 +59,7 @@ impl BuilderStates {
                 field_to_where_predicates,
             } = BuilderStatePair::new(graph, field_node, map);
 
-            // Idents of pair.
+            /* ✅ #TD93602268 Idents of pair. */
             let ident_added = format_ident!("{}{}Added", main_ident, ident_to_titlecase(&ident));
             let ident_empty = format_ident!("{}{}Empty", main_ident, ident_to_titlecase(&ident));
 
@@ -70,7 +70,10 @@ impl BuilderStates {
             generics.extend(field_to_main_consts.iter());
             generics.extend(field_to_main_types.iter());
 
-            // Determining where predicates related to the field.
+            /* ✅ #TD13775189 Phantoms init */
+            let mut phantoms = quote! {};
+
+            /* ✅ #TD18715806 Determining where predicates related to the field. */
             let mut where_predicates = Vec::new();
             for field_to_where_predicate in field_to_where_predicates {
                 let mut predicate = (*field_to_where_predicate.wp).clone();
@@ -117,6 +120,28 @@ impl BuilderStates {
                     generics_additions.extend(filter);
                 }
 
+                /* 🌀 COMPLEXITY #CP34264506 Using phantoms is needed some sub generic parameters. Add type parameters in the main generics and in the tuple as phantom data. */
+                let filter = field_to_where_predicate
+                    .right_types_phantoms_in_generics
+                    .into_iter()
+                    .filter(|p0| {
+                        !field_to_main_types
+                            .iter()
+                            .any(|p1| Self::compare_generic_params(p0, p1))
+                    })
+                    .collect::<Vec<_>>();
+                let filter_phantoms = filter
+                    .iter()
+                    .map(|f| {
+                        quote! { std::marker::PhantomData<#f> }
+                    })
+                    .collect::<Vec<_>>();
+                if !filter.is_empty() {
+                    phantoms = quote! { , #(#filter_phantoms),* };
+                }
+                generics_additions.extend(filter);
+
+                /* ✅ #TD60868169 Finally push produced predicate. */
                 where_predicates.push(predicate);
             }
             let where_clause = if where_predicates.is_empty() {
@@ -134,7 +159,7 @@ impl BuilderStates {
             };
 
             quote! {
-                struct #ident_added #generics(#ty) #where_clause;
+                struct #ident_added #generics(#ty #phantoms) #where_clause;
                 struct #ident_empty;
             }
         };
@@ -169,6 +194,7 @@ struct FieldToWherePredicate {
     wp: Rc<syn::WherePredicate>,
     right_lifetimes_in_generics: Vec<Rc<syn::GenericParam>>,
     right_types_in_generics: Vec<Rc<syn::GenericParam>>,
+    right_types_phantoms_in_generics: Vec<Rc<syn::GenericParam>>,
 }
 
 struct BuilderStatePair<'a> {
@@ -273,10 +299,18 @@ impl<'a> BuilderStatePair<'a> {
             false,
             Self::traverse_wp_to_main_generics,
         );
+        let right_types_phantoms_in_generics = traverse(
+            graph,
+            Some(&[&StructRelation::WPRightBoundingTypePhantomInMain]),
+            wp_node,
+            false,
+            Self::traverse_wp_to_main_generics,
+        );
         FieldToWherePredicate {
             wp: Rc::clone(&wp.syn),
             right_lifetimes_in_generics,
             right_types_in_generics,
+            right_types_phantoms_in_generics,
         }
     }
 

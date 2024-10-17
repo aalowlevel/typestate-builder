@@ -80,12 +80,14 @@ fn list_wp_assets(graph: &mut StructGraph, wp_field: NodeIndex) {
         left_bounded_lifetime,
         right_bounding_types,
         right_bounding_lifetimes,
+        right_bounding_phantoms,
     ) = wp.list();
     wp.left_bound_lifetimes = left_bound_lifetimes;
     wp.left_bounded_type = left_bounded_type;
     wp.left_bounded_lifetime = left_bounded_lifetime;
     wp.right_bounding_types = right_bounding_types;
     wp.right_bounding_lifetimes = right_bounding_lifetimes;
+    wp.right_bounding_phantoms = right_bounding_phantoms;
 }
 fn traversal_field_to_generics(
     graph: &mut StructGraph,
@@ -270,6 +272,7 @@ fn search_in_generics_by_wp(graph: &mut StructGraph, node_wp: NodeIndex, node_ge
         GenericParam::Type(type_param) => {
             let mut left = false;
             let mut right = false;
+            let mut right_phantom = false;
 
             if let Some(syn::Type::Path(type_path)) = &wp.left_bounded_type {
                 if let Some(ident) = type_path.path.get_ident() {
@@ -287,6 +290,17 @@ fn search_in_generics_by_wp(graph: &mut StructGraph, node_wp: NodeIndex, node_ge
                     }
                 }
             }
+            if let Some(tys_wp) = &wp.right_bounding_phantoms {
+                for ty_wp in tys_wp {
+                    if let syn::Type::Path(type_path) = ty_wp {
+                        if let Some(ident) = type_path.path.get_ident() {
+                            if ident == &type_param.ident {
+                                right_phantom = true;
+                            }
+                        }
+                    }
+                }
+            }
             if left {
                 graph.add_edge(
                     node_wp,
@@ -299,6 +313,13 @@ fn search_in_generics_by_wp(graph: &mut StructGraph, node_wp: NodeIndex, node_ge
                     node_wp,
                     node_generic,
                     StructRelation::WPRightBoundingTypeInMain,
+                );
+            }
+            if right_phantom {
+                graph.add_edge(
+                    node_wp,
+                    node_generic,
+                    StructRelation::WPRightBoundingTypePhantomInMain,
                 );
             }
         }

@@ -80,6 +80,7 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
                 left_bounded_lifetime: None,
                 right_bounding_types: None,
                 right_bounding_lifetimes: None,
+                right_bounding_phantoms: None,
             })
             .collect::<Vec<_>>();
         add_from_list!(
