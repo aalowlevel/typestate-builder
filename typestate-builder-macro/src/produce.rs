@@ -63,54 +63,58 @@ impl BuilderStates {
             let ident_added = format_ident!("{}{}Added", main_ident, ident_to_titlecase(&ident));
             let ident_empty = format_ident!("{}{}Empty", main_ident, ident_to_titlecase(&ident));
 
+            /* ✅ #TD39331204 Create and push field generics. */
+            let mut generics = Vec::new();
+            let mut generics_additions = Vec::new();
+            generics.extend(field_to_main_lifetimes.iter());
+            generics.extend(field_to_main_consts.iter());
+            generics.extend(field_to_main_types.iter());
+
             // Determining where predicates related to the field.
             let mut where_predicates = Vec::new();
             for field_to_where_predicate in field_to_where_predicates {
                 let mut predicate = (*field_to_where_predicate.wp).clone();
 
-                // Anomaly 1: Orphan wp right lifetimes. Add Higher-ranked trait bounds for them (ForLifetimes).
-                if field_to_where_predicate
-                    .right_lifetimes_in_generics
-                    .iter()
-                    .any(|p0| {
-                        !field_to_main_lifetimes
-                            .iter()
-                            .any(|p1| match (p0.as_ref(), p1.as_ref()) {
-                                (
-                                    syn::GenericParam::Lifetime(lifetime_param0),
-                                    syn::GenericParam::Lifetime(lifetime_param1),
-                                ) => lifetime_param0.lifetime == lifetime_param1.lifetime,
-                                (
-                                    syn::GenericParam::Type(type_param0),
-                                    syn::GenericParam::Type(type_param1),
-                                ) => type_param0.ident == type_param1.ident,
-                                _ => false,
-                            })
-                    })
+                /* 🌀 COMPLEXITY #CP60692702 Orphan wp right lifetimes. Add Higher-ranked trait bounds for them (ForLifetimes). */
                 {
-                    if let syn::WherePredicate::Type(pty) = &mut predicate {
-                        if let Some(ptyb) = &mut pty.lifetimes {
-                            let incoming_lts = field_to_where_predicate
-                                .right_lifetimes_in_generics
-                                .into_iter()
-                                .map(|f| (*f).clone())
-                                .collect::<Vec<_>>();
-                            ptyb.lifetimes.extend(incoming_lts);
-                        } else if !field_to_where_predicate
-                            .right_lifetimes_in_generics
-                            .is_empty()
-                        {
-                            let mut lts = syn::BoundLifetimes::default();
-                            lts.lifetimes.extend(
-                                field_to_where_predicate
-                                    .right_lifetimes_in_generics
-                                    .into_iter()
-                                    .map(|f| (*f).clone())
-                                    .collect::<Vec<_>>(),
-                            );
-                            pty.lifetimes = Some(lts);
+                    let filter = field_to_where_predicate
+                        .right_lifetimes_in_generics
+                        .into_iter()
+                        .filter(|p0| {
+                            !field_to_main_lifetimes
+                                .iter()
+                                .any(|p1| Self::compare_generic_params(p0, p1))
+                        })
+                        .map(|f| (*f).clone())
+                        .collect::<Vec<_>>();
+
+                    match &mut predicate {
+                        syn::WherePredicate::Lifetime(_predicate_lifetime) => unimplemented!(),
+                        syn::WherePredicate::Type(predicate_type) => {
+                            if let Some(ptyb) = &mut predicate_type.lifetimes {
+                                ptyb.lifetimes.extend(filter);
+                            } else if !filter.is_empty() {
+                                let mut lts = syn::BoundLifetimes::default();
+                                lts.lifetimes.extend(filter);
+                                predicate_type.lifetimes = Some(lts);
+                            }
                         }
+                        _ => unimplemented!(),
                     }
+                }
+
+                /* 🌀 COMPLEXITY #CP64472417 Orphan wp right types. Add type parameters in the main generics. */
+                {
+                    let filter = field_to_where_predicate
+                        .right_types_in_generics
+                        .into_iter()
+                        .filter(|p0| {
+                            !field_to_main_types
+                                .iter()
+                                .any(|p1| Self::compare_generic_params(p0, p1))
+                        })
+                        .collect::<Vec<_>>();
+                    generics_additions.extend(filter);
                 }
 
                 where_predicates.push(predicate);
@@ -122,10 +126,7 @@ impl BuilderStates {
             };
 
             // Determining main generics related to the field.
-            let mut generics = Vec::new();
-            generics.extend(field_to_main_lifetimes);
-            generics.extend(field_to_main_consts);
-            generics.extend(field_to_main_types);
+            generics.extend(generics_additions.iter());
             let generics = if generics.is_empty() {
                 quote! {}
             } else {
@@ -149,11 +150,25 @@ impl BuilderStates {
             )
         })
     }
+
+    fn compare_generic_params(p0: &Rc<syn::GenericParam>, p1: &Rc<syn::GenericParam>) -> bool {
+        match (p0.as_ref(), p1.as_ref()) {
+            (
+                syn::GenericParam::Lifetime(lifetime_param0),
+                syn::GenericParam::Lifetime(lifetime_param1),
+            ) => lifetime_param0.lifetime == lifetime_param1.lifetime,
+            (syn::GenericParam::Type(type_param0), syn::GenericParam::Type(type_param1)) => {
+                type_param0.ident == type_param1.ident
+            }
+            _ => false,
+        }
+    }
 }
 
 struct FieldToWherePredicate {
     wp: Rc<syn::WherePredicate>,
     right_lifetimes_in_generics: Vec<Rc<syn::GenericParam>>,
+    right_types_in_generics: Vec<Rc<syn::GenericParam>>,
 }
 
 struct BuilderStatePair<'a> {
@@ -251,9 +266,17 @@ impl<'a> BuilderStatePair<'a> {
             false,
             Self::traverse_wp_to_main_generics,
         );
+        let right_types_in_generics = traverse(
+            graph,
+            Some(&[&StructRelation::WPRightBoundingTypeInMain]),
+            wp_node,
+            false,
+            Self::traverse_wp_to_main_generics,
+        );
         FieldToWherePredicate {
             wp: Rc::clone(&wp.syn),
             right_lifetimes_in_generics,
+            right_types_in_generics,
         }
     }
 

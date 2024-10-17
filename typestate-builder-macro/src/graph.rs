@@ -349,10 +349,28 @@ impl WherePredicate {
                     |(mut types, mut lifetimes), bound| {
                         match bound {
                             syn::TypeParamBound::Trait(trait_bound) => {
-                                types.push(syn::Type::Path(syn::TypePath {
-                                    qself: None,
-                                    path: trait_bound.path.clone(),
-                                }));
+                                if let Some(segment) = trait_bound.path.segments.first() {
+                                    if segment.ident == "Fn"
+                                        || segment.ident == "FnMut"
+                                        || segment.ident == "FnOnce"
+                                    {
+                                        if let syn::PathArguments::Parenthesized(args) =
+                                            &segment.arguments
+                                        {
+                                            for arg in args.inputs.iter() {
+                                                types.push(arg.clone());
+                                            }
+                                            if let syn::ReturnType::Type(_, ty) = &args.output {
+                                                types.push(*(ty.clone()));
+                                            }
+                                        }
+                                    } else {
+                                        types.push(syn::Type::Path(syn::TypePath {
+                                            qself: None,
+                                            path: trait_bound.path.clone(),
+                                        }));
+                                    }
+                                }
                             }
                             syn::TypeParamBound::Lifetime(lifetime) => {
                                 lifetimes.push(lifetime.clone());

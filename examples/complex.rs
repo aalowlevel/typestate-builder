@@ -1,16 +1,20 @@
 #![allow(dead_code)]
 
-use std::marker::PhantomData;
-
 use typestate_builder::TypestateBuilder;
 
 fn main() {}
 
-#[derive(TypestateBuilder)]
-struct AdvancedPhantomStruct<'a, T>
+// #[derive(TypestateBuilder)]
+struct StructWithFunctionPointer<T, F>
 where
-    T: 'a + Clone,
+    F: Fn(T) -> T,
 {
-    reference: &'a T,
-    marker: PhantomData<T>,
+    func: F,
+    value: T,
 }
+struct StructWithFunctionPointerFuncAdded<F, T>(F)
+where
+    F: Fn(T) -> T;
+struct StructWithFunctionPointerFuncEmpty;
+struct StructWithFunctionPointerValueAdded<T>(T);
+struct StructWithFunctionPointerValueEmpty;

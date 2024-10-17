@@ -160,345 +160,345 @@ pub use typestate_builder_macro::TypestateBuilder;
 #[cfg(test)]
 #[allow(dead_code)]
 mod tests {
-    // use std::{
-    //     alloc::{GlobalAlloc, Layout},
-    //     collections::HashMap,
-    //     marker::PhantomData,
-    // };
+    use std::{
+        alloc::{GlobalAlloc, Layout},
+        collections::HashMap,
+        marker::PhantomData,
+    };
 
-    // use typestate_builder_macro::TypestateBuilder;
+    use typestate_builder_macro::TypestateBuilder;
 
+    #[derive(TypestateBuilder)]
+    struct BasicStructWithLifetimes<'a> {
+        name: &'a str,
+        age: u32,
+        description: &'a str,
+    }
+
+    #[derive(TypestateBuilder)]
+    struct GenericStruct<T, U>
+    where
+        T: Copy,
+        U: Copy,
+    {
+        field1: T,
+        field2: U,
+    }
+
+    #[derive(TypestateBuilder)]
+    struct InnerStruct {
+        x: i32,
+        y: i32,
+    }
+
+    #[derive(TypestateBuilder)]
+    struct OuterStruct {
+        name: String,
+        inner: InnerStruct,
+        active: bool,
+    }
+
+    /* Panic: TypestateBuilder only supports structs */
     // #[derive(TypestateBuilder)]
-    // struct BasicStructWithLifetimes<'a> {
-    //     name: &'a str,
-    //     age: u32,
-    //     description: &'a str,
-    // }
+    enum Status {
+        Active,
+        Inactive,
+        Suspended,
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct GenericStruct<T, U>
-    // where
-    //     T: Copy,
-    //     U: Copy,
-    // {
-    //     field1: T,
-    //     field2: U,
-    // }
+    #[derive(TypestateBuilder)]
+    struct EnumWithinStruct {
+        user_id: u64,
+        status: Status,
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct InnerStruct {
-    //     x: i32,
-    //     y: i32,
-    // }
+    #[derive(TypestateBuilder)]
+    struct StructWithOptionals {
+        title: Option<String>,
+        description: Option<String>,
+        rating: Option<u8>,
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct OuterStruct {
-    //     name: String,
-    //     inner: InnerStruct,
-    //     active: bool,
-    // }
+    #[derive(TypestateBuilder)]
+    struct TupleStruct(i32, f64, String, Option<u8>);
 
-    // /* Panic: TypestateBuilder only supports structs */
-    // // #[derive(TypestateBuilder)]
-    // enum Status {
-    //     Active,
-    //     Inactive,
-    //     Suspended,
-    // }
+    #[derive(TypestateBuilder)]
+    struct ComplexStruct {
+        name: String,
+        values: Vec<i32>,
+        map: HashMap<String, u64>,
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct EnumWithinStruct {
-    //     user_id: u64,
-    //     status: Status,
-    // }
+    #[derive(TypestateBuilder)]
+    struct RecursiveStruct {
+        value: i32,
+        next: Option<Box<RecursiveStruct>>,
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct StructWithOptionals {
-    //     title: Option<String>,
-    //     description: Option<String>,
-    //     rating: Option<u8>,
-    // }
+    #[derive(TypestateBuilder)]
+    struct PhantomStruct<T> {
+        data: i32,
+        marker: PhantomData<T>,
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct TupleStruct(i32, f64, String, Option<u8>);
+    #[derive(TypestateBuilder)]
+    struct MultiBoundGeneric<T, U>
+    where
+        T: Clone + Default + std::fmt::Debug,
+        U: Into<String> + Copy,
+    {
+        item1: T,
+        item2: U,
+        data: Vec<T>,
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct ComplexStruct {
-    //     name: String,
-    //     values: Vec<i32>,
-    //     map: HashMap<String, u64>,
-    // }
+    trait Processor {
+        type Input;
+        type Output;
 
-    // #[derive(TypestateBuilder)]
-    // struct RecursiveStruct {
-    //     value: i32,
-    //     next: Option<Box<RecursiveStruct>>,
-    // }
+        fn process(&self, input: Self::Input) -> Self::Output;
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct PhantomStruct<T> {
-    //     data: i32,
-    //     marker: PhantomData<T>,
-    // }
+    #[derive(TypestateBuilder)]
+    struct StructWithAssociatedTypes<T>
+    where
+        T: Processor,
+    {
+        processor: T,
+        input: T::Input,
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct MultiBoundGeneric<T, U>
-    // where
-    //     T: Clone + Default + std::fmt::Debug,
-    //     U: Into<String> + Copy,
-    // {
-    //     item1: T,
-    //     item2: U,
-    //     data: Vec<T>,
-    // }
+    trait Container {
+        type Item;
 
-    // trait Processor {
-    //     type Input;
-    //     type Output;
+        fn add_item(&mut self, item: Self::Item);
+        fn get_item(&self) -> &Self::Item;
+    }
 
-    //     fn process(&self, input: Self::Input) -> Self::Output;
-    // }
+    #[derive(TypestateBuilder)]
+    struct GenericContainer<T>
+    where
+        T: Container,
+    {
+        container: T,
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct StructWithAssociatedTypes<T>
-    // where
-    //     T: Processor,
-    // {
-    //     processor: T,
-    //     input: T::Input,
-    // }
+    #[derive(TypestateBuilder)]
+    struct AdvancedPhantomStruct<'a, T>
+    where
+        T: 'a + Clone,
+    {
+        reference: &'a T,
+        marker: PhantomData<T>,
+    }
 
-    // trait Container {
-    //     type Item;
+    trait Drawable {
+        fn draw(&self);
+    }
 
-    //     fn add_item(&mut self, item: Self::Item);
-    //     fn get_item(&self) -> &Self::Item;
-    // }
+    #[derive(TypestateBuilder)]
+    struct GenericWithTraitObject<'a, T>
+    where
+        T: 'a + Drawable,
+    {
+        drawable_item: Box<dyn Drawable + 'a>,
+        generic_item: T,
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct GenericContainer<T>
-    // where
-    //     T: Container,
-    // {
-    //     container: T,
-    // }
+    #[derive(TypestateBuilder)]
+    struct StructWithFunctionPointer<T, F>
+    where
+        F: Fn(T) -> T,
+    {
+        func: F,
+        value: T,
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct AdvancedPhantomStruct<'a, T>
-    // where
-    //     T: 'a + Clone,
-    // {
-    //     reference: &'a T,
-    //     marker: PhantomData<T>,
-    // }
+    trait Graph {
+        type Node<'a>
+        where
+            Self: 'a;
+        type Edge<'a>
+        where
+            Self: 'a;
 
-    // trait Drawable {
-    //     fn draw(&self);
-    // }
+        fn get_node(&self) -> Self::Node<'_>;
+        fn get_edge(&self) -> Self::Edge<'_>;
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct GenericWithTraitObject<'a, T>
-    // where
-    //     T: 'a + Drawable,
-    // {
-    //     drawable_item: Box<dyn Drawable + 'a>,
-    //     generic_item: T,
-    // }
+    #[derive(TypestateBuilder)]
+    struct GraphStruct<T>
+    where
+        T: Graph,
+    {
+        graph: T,
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct StructWithFunctionPointer<T, F>
-    // where
-    //     F: Fn(T) -> T,
-    // {
-    //     func: F,
-    //     value: T,
-    // }
+    impl<T> GraphStruct<T>
+    where
+        T: Graph,
+    {
+        fn display_node(&self) {
+            // let node = self.graph.get_node();
+            // Implement some logic to display the node
+        }
+    }
 
-    // trait Graph {
-    //     type Node<'a>
-    //     where
-    //         Self: 'a;
-    //     type Edge<'a>
-    //     where
-    //         Self: 'a;
+    #[derive(TypestateBuilder)]
+    struct ArrayWrapper<T, const N: usize> {
+        items: [T; N],
+    }
 
-    //     fn get_node(&self) -> Self::Node<'_>;
-    //     fn get_edge(&self) -> Self::Edge<'_>;
-    // }
+    impl<T, const N: usize> ArrayWrapper<T, N> {
+        fn new(items: [T; N]) -> Self {
+            ArrayWrapper { items }
+        }
 
-    // #[derive(TypestateBuilder)]
-    // struct GraphStruct<T>
-    // where
-    //     T: Graph,
-    // {
-    //     graph: T,
-    // }
+        fn get_length(&self) -> usize {
+            N
+        }
+    }
 
-    // impl<T> GraphStruct<T>
-    // where
-    //     T: Graph,
-    // {
-    //     fn display_node(&self) {
-    //         // let node = self.graph.get_node();
-    //         // Implement some logic to display the node
-    //     }
-    // }
+    trait Action {
+        fn execute(&self);
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct ArrayWrapper<T, const N: usize> {
-    //     items: [T; N],
-    // }
+    #[derive(TypestateBuilder)]
+    struct Dispatcher<T: Action> {
+        handler: Box<dyn Action>,
+        generic_handler: T,
+    }
 
-    // impl<T, const N: usize> ArrayWrapper<T, N> {
-    //     fn new(items: [T; N]) -> Self {
-    //         ArrayWrapper { items }
-    //     }
+    impl<T: Action> Dispatcher<T> {
+        fn run(&self) {
+            self.handler.execute();
+            self.generic_handler.execute();
+        }
+    }
 
-    //     fn get_length(&self) -> usize {
-    //         N
-    //     }
-    // }
+    #[derive(TypestateBuilder)]
+    struct NestedGenerics<'a, T, U>
+    where
+        T: 'a + Copy + Clone,
+        U: 'a + AsRef<T> + Clone,
+    {
+        value: &'a T,
+        ref_container: U,
+    }
 
-    // trait Action {
-    //     fn execute(&self);
-    // }
+    impl<'a, T, U> NestedGenerics<'a, T, U>
+    where
+        T: 'a + Copy + Clone,
+        U: 'a + AsRef<T> + Clone,
+    {
+        fn get_value(&self) -> T {
+            *self.value
+        }
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct Dispatcher<T: Action> {
-    //     handler: Box<dyn Action>,
-    //     generic_handler: T,
-    // }
+    #[derive(TypestateBuilder)]
+    struct Tree<'a, T, U>
+    where
+        T: 'a + Clone,
+        U: 'a + Clone,
+    {
+        value: &'a T,
+        children: Vec<Tree<'a, U, T>>,
+    }
 
-    // impl<T: Action> Dispatcher<T> {
-    //     fn run(&self) {
-    //         self.handler.execute();
-    //         self.generic_handler.execute();
-    //     }
-    // }
+    impl<'a, T, U> Tree<'a, T, U>
+    where
+        T: 'a + Clone,
+        U: 'a + Clone,
+    {
+        fn new(value: &'a T) -> Self {
+            Tree {
+                value,
+                children: Vec::new(),
+            }
+        }
 
-    // #[derive(TypestateBuilder)]
-    // struct NestedGenerics<'a, T, U>
-    // where
-    //     T: 'a + Copy + Clone,
-    //     U: 'a + AsRef<T> + Clone,
-    // {
-    //     value: &'a T,
-    //     ref_container: U,
-    // }
+        fn add_child(&mut self, child: Tree<'a, U, T>) {
+            self.children.push(child);
+        }
+    }
 
-    // impl<'a, T, U> NestedGenerics<'a, T, U>
-    // where
-    //     T: 'a + Copy + Clone,
-    //     U: 'a + AsRef<T> + Clone,
-    // {
-    //     fn get_value(&self) -> T {
-    //         *self.value
-    //     }
-    // }
+    #[derive(TypestateBuilder)]
+    struct ComplexGraph<'a, N, E>
+    where
+        N: 'a,
+        E: 'a,
+    {
+        nodes: Vec<N>,
+        edges: Vec<(N, N, E)>,
+        _marker: PhantomData<&'a ()>,
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct Tree<'a, T, U>
-    // where
-    //     T: 'a + Clone,
-    //     U: 'a + Clone,
-    // {
-    //     value: &'a T,
-    //     children: Vec<Tree<'a, U, T>>,
-    // }
+    #[derive(TypestateBuilder)]
+    struct OptionWrapper<T, const IS_SOME: bool> {
+        value: Option<T>,
+    }
 
-    // impl<'a, T, U> Tree<'a, T, U>
-    // where
-    //     T: 'a + Clone,
-    //     U: 'a + Clone,
-    // {
-    //     fn new(value: &'a T) -> Self {
-    //         Tree {
-    //             value,
-    //             children: Vec::new(),
-    //         }
-    //     }
+    impl<T> OptionWrapper<T, true> {
+        fn new(value: T) -> Self {
+            OptionWrapper { value: Some(value) }
+        }
 
-    //     fn add_child(&mut self, child: Tree<'a, U, T>) {
-    //         self.children.push(child);
-    //     }
-    // }
+        fn get(&self) -> &T {
+            self.value.as_ref().unwrap()
+        }
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct ComplexGraph<'a, N, E>
-    // where
-    //     N: 'a,
-    //     E: 'a,
-    // {
-    //     nodes: Vec<N>,
-    //     edges: Vec<(N, N, E)>,
-    //     _marker: PhantomData<&'a ()>,
-    // }
+    impl<T> OptionWrapper<T, false> {
+        fn new_none() -> Self {
+            OptionWrapper { value: None }
+        }
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct OptionWrapper<T, const IS_SOME: bool> {
-    //     value: Option<T>,
-    // }
+    #[derive(TypestateBuilder)]
+    struct DeeplyNested<'a, 'b, T, U>
+    where
+        T: 'a + Copy,
+        U: 'b + Clone,
+    {
+        level_one: &'a T,
+        level_two: &'b U,
+        sub_nested: Vec<&'a DeeplyNested<'a, 'b, T, U>>,
+    }
 
-    // impl<T> OptionWrapper<T, true> {
-    //     fn new(value: T) -> Self {
-    //         OptionWrapper { value: Some(value) }
-    //     }
+    impl<'a, 'b, T, U> DeeplyNested<'a, 'b, T, U>
+    where
+        T: 'a + Copy,
+        U: 'b + Clone,
+    {
+        fn new(level_one: &'a T, level_two: &'b U) -> Self {
+            DeeplyNested {
+                level_one,
+                level_two,
+                sub_nested: Vec::new(),
+            }
+        }
 
-    //     fn get(&self) -> &T {
-    //         self.value.as_ref().unwrap()
-    //     }
-    // }
+        fn add_nested(&mut self, nested: &'a DeeplyNested<'a, 'b, T, U>) {
+            self.sub_nested.push(nested);
+        }
+    }
 
-    // impl<T> OptionWrapper<T, false> {
-    //     fn new_none() -> Self {
-    //         OptionWrapper { value: None }
-    //     }
-    // }
+    #[derive(TypestateBuilder)]
+    struct CustomAllocator<T, A: GlobalAlloc> {
+        allocator: A,
+        data: *mut T,
+    }
 
-    // #[derive(TypestateBuilder)]
-    // struct DeeplyNested<'a, 'b, T, U>
-    // where
-    //     T: 'a + Copy,
-    //     U: 'b + Clone,
-    // {
-    //     level_one: &'a T,
-    //     level_two: &'b U,
-    //     sub_nested: Vec<&'a DeeplyNested<'a, 'b, T, U>>,
-    // }
+    impl<T, A: GlobalAlloc> CustomAllocator<T, A> {
+        fn allocate(&mut self) -> *mut T {
+            let layout = Layout::new::<T>();
+            unsafe { self.allocator.alloc(layout) as *mut T }
+        }
 
-    // impl<'a, 'b, T, U> DeeplyNested<'a, 'b, T, U>
-    // where
-    //     T: 'a + Copy,
-    //     U: 'b + Clone,
-    // {
-    //     fn new(level_one: &'a T, level_two: &'b U) -> Self {
-    //         DeeplyNested {
-    //             level_one,
-    //             level_two,
-    //             sub_nested: Vec::new(),
-    //         }
-    //     }
-
-    //     fn add_nested(&mut self, nested: &'a DeeplyNested<'a, 'b, T, U>) {
-    //         self.sub_nested.push(nested);
-    //     }
-    // }
-
-    // #[derive(TypestateBuilder)]
-    // struct CustomAllocator<T, A: GlobalAlloc> {
-    //     allocator: A,
-    //     data: *mut T,
-    // }
-
-    // impl<T, A: GlobalAlloc> CustomAllocator<T, A> {
-    //     fn allocate(&mut self) -> *mut T {
-    //         let layout = Layout::new::<T>();
-    //         unsafe { self.allocator.alloc(layout) as *mut T }
-    //     }
-
-    //     fn deallocate(&mut self, ptr: *mut T) {
-    //         let layout = Layout::new::<T>();
-    //         unsafe { self.allocator.dealloc(ptr as *mut u8, layout) }
-    //     }
-    // }
+        fn deallocate(&mut self, ptr: *mut T) {
+            let layout = Layout::new::<T>();
+            unsafe { self.allocator.dealloc(ptr as *mut u8, layout) }
+        }
+    }
 }
