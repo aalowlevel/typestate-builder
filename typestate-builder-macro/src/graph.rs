@@ -147,15 +147,17 @@ pub enum StructRelation {
     FieldGenericInMainLifetime,
     FieldGenericInMainConst,
     FieldGenericInWhereClause,
+    FieldToBuilderField,
     WPLeftBoundedTypeInMain,
     WPLeftBoundedLifetimeInMain,
     WPRightBoundingTypeInMain,
     WPRightBoundingTypePhantomInMain,
     WPRightBoundingLifetimeInMain,
-    FieldToBuilderState,
-    BuilderStatePair,
     BuilderFieldTrain,
+    BuilderFieldToBuilderGeneric,
+    BuilderFieldToBuilderState,
     BuilderGenericTrain,
+    BuilderStatePair,
 }
 
 pub type StructGraph = Graph<StructElement, StructRelation>;
@@ -527,8 +529,28 @@ impl Serialize for WherePredicate {
     }
 }
 
-#[derive(Serialize)]
-pub struct BuilderStateAdded {}
+pub struct BuilderStateAdded {
+    pub ident: syn::Ident,
+    pub generics: Vec<Rc<syn::GenericParam>>,
+    pub ty: syn::Type,
+    pub where_predicates: Vec<syn::WherePredicate>,
+    pub phantoms: Vec<Rc<syn::GenericParam>>,
+}
+
+impl Serialize for BuilderStateAdded {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut res = serializer.serialize_struct("BuilderStateAdded", 5)?;
+        res.serialize_field("ident", &self.ident.to_string())?;
+        res.skip_field("generics")?;
+        res.skip_field("ty")?;
+        res.skip_field("where_predicates")?;
+        res.skip_field("phantoms")?;
+        res.end()
+    }
+}
 
 pub fn traverse<'a, N, E, F, R>(
     graph: &'a Graph<N, E>,
