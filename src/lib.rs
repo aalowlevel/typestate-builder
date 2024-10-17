@@ -69,6 +69,8 @@ In this example, the Person struct uses the `TypestateBuilder` derive macro to c
 
 - Final Assembly: The `build` method assembles the final struct once all required fields have been set, preventing the creation of incomplete instances.
 
+- Graph analysis: This crate internally analyzes the sub-elements of structures with graph and manages the relationships between them. Thus, the source of the final generated code is from this analysis.
+
 ## Code Expanded
 
 The expanded version of the above code is like this:
@@ -146,9 +148,9 @@ impl PersonBuilder<
 }
 ```
 
-## Limitations
+## Possible Limitations
 
-In fact, i really can't know (and no one will ever know) where is the final frontier of this crate. But i pasted [dozens complex structs here](https://github.com/aalowlevel/typestate-builder/blob/master/src/lib.rs) to have them as for setting goals, not all of them can be expected to pass the tests. Therefore, it's impossible to give a guarantee in a universe where black can be found blacker, just don't get too complicated.
+In fact, I’m not entirely sure what the upper limit is for the most complex struct that this crate can handle. However, I’ve added [dozens of complex structs here](https://github.com/aalowlevel/typestate-builder/blob/master/src/lib.rs) for testing purposes, and the crate successfully handles all of them. If you have any new ideas for testing structs, feel free to send me a PR.
 
 ## License
 

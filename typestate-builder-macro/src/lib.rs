@@ -35,6 +35,8 @@ use syn::{parse_macro_input, DeriveInput};
 /// typestate pattern. It provides compile-time guarantees that all necessary fields
 /// are initialized before building the final struct.
 ///
+/// For more information, read [the document of the consumer crate](https://docs.rs/typestate-builder/latest/typestate_builder/).
+///
 /// # Panics
 /// This macro will panic if applied to a non-struct type (such as an enum or union).
 #[proc_macro_derive(TypestateBuilder)]
