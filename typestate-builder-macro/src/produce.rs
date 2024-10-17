@@ -11,13 +11,17 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
+mod builder;
+mod builder_build_impl;
+mod builder_impl;
+mod builder_new_impl;
+mod builder_states;
+
 use indexmap::IndexMap;
 use petgraph::graph::NodeIndex;
 use proc_macro2::TokenStream as TokenStream2;
 
 use crate::graph::StructGraph;
-
-mod builder_states;
 
 pub struct Produce {
     pub graph: StructGraph,
@@ -31,8 +35,3 @@ pub fn run(graph: StructGraph, map: IndexMap<String, NodeIndex>) -> Produce {
     }
     Produce { graph, res }
 }
-
-struct Builder {}
-struct BuilderNewImpl {}
-struct BuilderImpl {}
-struct BuilderBuildImpl {}
