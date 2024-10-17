@@ -71,7 +71,7 @@ impl BuilderStates {
             generics.extend(field_to_main_types.iter());
 
             /* ✅ #TD13775189 Phantoms init */
-            let mut phantoms = quote! {};
+            let mut phantoms = Vec::new();
 
             /* ✅ #TD18715806 Determining where predicates related to the field. */
             let mut where_predicates = Vec::new();
@@ -136,9 +136,7 @@ impl BuilderStates {
                         quote! { std::marker::PhantomData<#f> }
                     })
                     .collect::<Vec<_>>();
-                if !filter.is_empty() {
-                    phantoms = quote! { , #(#filter_phantoms),* };
-                }
+                phantoms.extend(filter_phantoms);
                 generics_additions.extend(filter);
 
                 /* ✅ #TD60868169 Finally push produced predicate. */
@@ -150,12 +148,19 @@ impl BuilderStates {
                 quote! { where #(#where_predicates),* }
             };
 
-            // Determining main generics related to the field.
+            /* ✅ #TD76108810 Determining main generics related to the field. */
             generics.extend(generics_additions.iter());
             let generics = if generics.is_empty() {
                 quote! {}
             } else {
                 quote! { < #(#generics),* > }
+            };
+
+            /* ✅ #TD51147690 Determining phantoms. */
+            let phantoms = if !phantoms.is_empty() {
+                quote! { , #(#phantoms),* }
+            } else {
+                quote! {}
             };
 
             quote! {
