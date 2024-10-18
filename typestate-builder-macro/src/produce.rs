@@ -44,7 +44,7 @@ mod builder {
             panic!("{}", msg::ix::BUILDER_IDENT);
         };
         let StructElement::BuilderIdent(ident) = &graph[*ix] else {
-            panic!("{}", msg::node::IDENT);
+            panic!("{}", msg::node::BUILDER_IDENT);
         };
         let Some(ix) = map.get(mapkey::uniq::VIS) else {
             panic!("{}", msg::ix::VIS);
