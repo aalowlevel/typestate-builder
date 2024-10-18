@@ -11,7 +11,7 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use std::{collections::VecDeque, rc::Rc};
+use std::rc::Rc;
 
 use indexmap::IndexSet;
 use petgraph::{
@@ -590,18 +590,20 @@ where
     E: std::cmp::PartialEq,
 {
     let capacity = graph.capacity().0;
-    let mut queue = VecDeque::new();
+    let mut stack = Vec::with_capacity(capacity);
     let mut visited = IndexSet::with_capacity(capacity);
     let mut results = Vec::with_capacity(capacity);
-    queue.push_back(start_node);
+    stack.push((start_node, None));
 
-    if include_start {
-        let result = node_action(graph, None, start_node);
-        results.push(result);
-    }
+    while let Some((node, edge)) = stack.pop() {
+        if !visited.contains(&node) {
+            visited.insert(node);
 
-    while let Some(node) = queue.pop_front() {
-        if visited.insert(node) {
+            if edge.is_some() || include_start {
+                let result = node_action(graph, edge, node);
+                results.push(result);
+            }
+
             let mut neighbors: Vec<_> = graph
                 .neighbors(node)
                 .filter_map(|neighbor| graph.find_edge(node, neighbor).map(|edge| (edge, neighbor)))
@@ -615,6 +617,7 @@ where
                         .position(|&p| p == &graph[edge])
                         .unwrap_or(usize::MAX)
                 });
+                neighbors.reverse(); // Reverse to maintain priority order when pushing to stack
             }
 
             for (edge, neighbor) in neighbors {
@@ -624,10 +627,8 @@ where
                     }
                 }
 
-                let result = node_action(graph, Some(edge), neighbor);
-                results.push(result);
                 if !visited.contains(&neighbor) {
-                    queue.push_back(neighbor);
+                    stack.push((neighbor, Some(edge)));
                 }
             }
         }
@@ -646,18 +647,20 @@ where
     E: std::cmp::PartialEq,
 {
     let capacity = graph.capacity().0;
-    let mut queue = VecDeque::new();
+    let mut stack = Vec::with_capacity(capacity);
     let mut visited = IndexSet::with_capacity(capacity);
     let mut results = Vec::with_capacity(capacity);
-    queue.push_back(start_node);
+    stack.push((start_node, None));
 
-    if include_start {
-        let result = node_action(graph, None, start_node);
-        results.push(result);
-    }
+    while let Some((node, edge)) = stack.pop() {
+        if !visited.contains(&node) {
+            visited.insert(node);
 
-    while let Some(node) = queue.pop_front() {
-        if visited.insert(node) {
+            if edge.is_some() || include_start {
+                let result = node_action(graph, edge, node);
+                results.push(result);
+            }
+
             let mut neighbors: Vec<_> = graph
                 .neighbors(node)
                 .filter_map(|neighbor| graph.find_edge(node, neighbor).map(|edge| (edge, neighbor)))
@@ -671,6 +674,7 @@ where
                         .position(|&p| p == &graph[edge])
                         .unwrap_or(usize::MAX)
                 });
+                neighbors.reverse(); // Reverse to maintain priority order when pushing to stack
             }
 
             for (edge, neighbor) in neighbors {
@@ -680,10 +684,8 @@ where
                     }
                 }
 
-                let result = node_action(graph, Some(edge), neighbor);
-                results.push(result);
                 if !visited.contains(&neighbor) {
-                    queue.push_back(neighbor);
+                    stack.push((neighbor, Some(edge)));
                 }
             }
         }
