@@ -136,14 +136,19 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
                 format_ident!("{}{}Added", main_ident, to_titlecase(&ident.to_string()));
 
             /* ✅ #TD39331204 Create field generics. */
-            let mut generics = Vec::new();
-            let mut generics_additions = Vec::new();
+            let len_additions = field_to_where_predicates.len() * 2;
+            let len_generics = field_to_main_lifetimes.len()
+                + field_to_main_consts.len()
+                + field_to_main_types.len()
+                + len_additions;
+            let mut generics = Vec::with_capacity(len_generics);
+            let mut generics_additions = Vec::with_capacity(len_generics);
 
             /* ✅ #TD13775189 Phantoms init */
-            let mut phantoms = Vec::new();
+            let mut phantoms = Vec::with_capacity(field_to_where_predicates.len());
 
             /* ✅ #TD18715806 Determining where predicates related to the field. */
-            let mut where_predicates = Vec::new();
+            let mut where_predicates = Vec::with_capacity(field_to_where_predicates.len());
             for field_to_where_predicate in field_to_where_predicates {
                 let mut predicate = (*field_to_where_predicate.wp).clone();
 

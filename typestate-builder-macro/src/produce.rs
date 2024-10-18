@@ -223,7 +223,7 @@ mod builder_states {
     }
 }
 
-mod builder_build_impl {
+mod builder_new_impl {
     use indexmap::IndexMap;
     use petgraph::graph::NodeIndex;
     use proc_macro2::TokenStream as TokenStream2;
@@ -255,7 +255,7 @@ mod builder_impl {
     }
 }
 
-mod builder_new_impl {
+mod builder_build_impl {
     use indexmap::IndexMap;
     use petgraph::graph::NodeIndex;
     use proc_macro2::TokenStream as TokenStream2;

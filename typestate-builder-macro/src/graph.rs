@@ -469,7 +469,11 @@ impl WherePredicate {
         bounds: &syn::punctuated::Punctuated<syn::TypeParamBound, syn::token::Plus>,
     ) -> (Vec<syn::Type>, Vec<syn::Lifetime>, Vec<syn::Type>) {
         bounds.iter().fold(
-            (Vec::new(), Vec::new(), Vec::new()),
+            (
+                Vec::with_capacity(bounds.len()),
+                Vec::with_capacity(bounds.len()),
+                Vec::with_capacity(bounds.len()),
+            ),
             |(mut types, mut lifetimes, mut phantoms), bound| {
                 match bound {
                     syn::TypeParamBound::Trait(trait_bound) => {
@@ -586,9 +590,10 @@ where
     F: FnMut(&Graph<N, E>, Option<EdgeIndex>, NodeIndex) -> R,
     E: std::cmp::PartialEq,
 {
+    let capacity = graph.capacity().0;
     let mut queue = VecDeque::new();
-    let mut visited = IndexSet::new();
-    let mut results = Vec::new();
+    let mut visited = IndexSet::with_capacity(capacity);
+    let mut results = Vec::with_capacity(capacity);
     queue.push_back(start_node);
 
     if include_start {
@@ -641,9 +646,10 @@ where
     F: FnMut(&mut Graph<N, E>, Option<EdgeIndex>, NodeIndex) -> R,
     E: std::cmp::PartialEq,
 {
+    let capacity = graph.capacity().0;
     let mut queue = VecDeque::new();
-    let mut visited = IndexSet::new();
-    let mut results = Vec::new();
+    let mut visited = IndexSet::with_capacity(capacity);
+    let mut results = Vec::with_capacity(capacity);
     queue.push_back(start_node);
 
     if include_start {
