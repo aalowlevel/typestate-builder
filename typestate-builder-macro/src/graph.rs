@@ -119,7 +119,7 @@ impl Serialize for StructElement {
                 .serialize_newtype_variant(
                     "StructElement",
                     0,
-                    "BuilderStateEmpty",
+                    "BuilderStateAdded",
                     builder_state_added.as_ref(),
                 ),
             StructElement::BuilderIdent(ident) => serializer.serialize_newtype_variant(

@@ -224,7 +224,9 @@ mod builder_new_impl {
     use proc_macro2::TokenStream as TokenStream2;
     use quote::quote;
 
-    use crate::graph::{mapkey, msg, traverse, StructElement, StructGraph, StructRelation};
+    use crate::graph::{
+        mapkey, msg, traverse, StructElement, StructGraph, StructRelation, StructType,
+    };
 
     pub(super) fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> TokenStream2 {
         let Some(ix) = map.get(mapkey::uniq::IDENT) else {
@@ -233,11 +235,23 @@ mod builder_new_impl {
         let StructElement::Ident(ident) = &graph[*ix] else {
             panic!("{}", msg::node::IDENT);
         };
+        let Some(ix) = map.get(mapkey::uniq::BUILDER_IDENT) else {
+            panic!("{}", msg::ix::BUILDER_IDENT);
+        };
+        let StructElement::BuilderIdent(builder_ident) = &graph[*ix] else {
+            panic!("{}", msg::node::BUILDER_IDENT);
+        };
         let Some(ix) = map.get(mapkey::uniq::VIS) else {
             panic!("{}", msg::ix::VIS);
         };
         let StructElement::Visibility(vis) = &graph[*ix] else {
             panic!("{}", msg::node::VIS);
+        };
+        let Some(ix) = map.get(mapkey::uniq::TYPE) else {
+            panic!("{}", msg::ix::TYPE);
+        };
+        let StructElement::Type(ty) = &graph[*ix] else {
+            panic!("{}", msg::node::TYPE);
         };
 
         let generics = map.get(mapkey::startp::GENERICS).map(|start| {
@@ -308,10 +322,68 @@ mod builder_new_impl {
             }
         });
 
-        quote! {
-            impl #first #ident #second #where_clause {
-                #vis fn builder() {}
+        let builder_others = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
+            let collected = traverse(
+                graph,
+                Some(&[
+                    &StructRelation::BuilderFieldToBuilderState,
+                    &StructRelation::BuilderFieldTrain,
+                ]),
+                *start,
+                true,
+                |graph, _edge, node| match &graph[node] {
+                    StructElement::BuilderStateEmpty(rc) => (None, Some(Rc::clone(rc))),
+                    StructElement::BuilderField(rc) => (Some(Rc::clone(rc)), None),
+                    _ => (None, None),
+                },
+            );
+            let mut fields = Vec::with_capacity(collected.len());
+            let mut empties = Vec::with_capacity(collected.len());
+            for (field, empty) in collected {
+                if let Some(inner) = field {
+                    fields.push(inner);
+                }
+                if let Some(inner) = empty {
+                    empties.push(inner);
+                }
             }
+            assert_eq!(fields.len(), empties.len());
+
+            let return_type_generics = if !empties.is_empty() {
+                quote! { <#(#empties),*> }
+            } else {
+                quote! {}
+            };
+            let constructor_data = match ty {
+                StructType::Named => {
+                    let constructor_fields = fields
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, field)| {
+                            let ty = &empties[i];
+                            quote! { #field: #ty }
+                        })
+                        .collect::<Vec<_>>();
+                    quote! {{ #(#constructor_fields),* }}
+                }
+                StructType::Unnamed => {
+                    quote! {( #(#empties),* )}
+                }
+            };
+            (return_type_generics, constructor_data)
+        });
+
+        match builder_others {
+            Some((return_type_generics, constructor_data)) => {
+                quote! {
+                    impl #first #ident #second #where_clause {
+                        #vis fn builder() -> #builder_ident #return_type_generics  {
+                            #builder_ident #constructor_data
+                        }
+                    }
+                }
+            }
+            None => quote! {},
         }
     }
 }
