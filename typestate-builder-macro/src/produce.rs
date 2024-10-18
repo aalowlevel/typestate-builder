@@ -322,7 +322,7 @@ mod builder_new_impl {
             }
         });
 
-        let builder_others = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
+        let data = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
             let collected = traverse(
                 graph,
                 Some(&[
@@ -348,14 +348,17 @@ mod builder_new_impl {
                 }
             }
             assert_eq!(fields.len(), empties.len());
+            (fields, empties)
+        });
 
-            let return_type_generics = if !empties.is_empty() {
-                quote! { <#(#empties),*> }
-            } else {
-                quote! {}
-            };
-            let constructor_data = match ty {
-                StructType::Named => {
+        match (ty, data) {
+            (StructType::Named, data) => {
+                if let Some((fields, empties)) = data {
+                    let return_type_generics = if !empties.is_empty() {
+                        quote! { <#(#empties),*> }
+                    } else {
+                        quote! {}
+                    };
                     let constructor_fields = fields
                         .into_iter()
                         .enumerate()
@@ -364,26 +367,51 @@ mod builder_new_impl {
                             quote! { #field: #ty }
                         })
                         .collect::<Vec<_>>();
-                    quote! {{ #(#constructor_fields),* }}
-                }
-                StructType::Unnamed => {
-                    quote! {( #(#empties),* )}
-                }
-            };
-            (return_type_generics, constructor_data)
-        });
 
-        match builder_others {
-            Some((return_type_generics, constructor_data)) => {
-                quote! {
-                    impl #first #ident #second #where_clause {
-                        #vis fn builder() -> #builder_ident #return_type_generics  {
-                            #builder_ident #constructor_data
+                    quote! {
+                        impl #first #ident #second #where_clause {
+                            #vis fn builder() -> #builder_ident #return_type_generics  {
+                                #builder_ident {
+                                    #(#constructor_fields),*
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    quote! {
+                        impl #first #ident #second #where_clause {
+                            #vis fn builder() -> #builder_ident  {
+                                #builder_ident {}
+                            }
                         }
                     }
                 }
             }
-            None => quote! {},
+            (StructType::Unnamed, data) => {
+                if let Some((_, empties)) = data {
+                    let return_type_generics = if !empties.is_empty() {
+                        quote! { <#(#empties),*> }
+                    } else {
+                        quote! {}
+                    };
+
+                    quote! {
+                        impl #first #ident #second #where_clause {
+                            #vis fn builder() -> #builder_ident #return_type_generics  {
+                                #builder_ident ( #(#empties),* )
+                            }
+                        }
+                    }
+                } else {
+                    quote! {
+                        impl #first #ident #second #where_clause {
+                            #vis fn builder() -> #builder_ident  {
+                                #builder_ident ()
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
