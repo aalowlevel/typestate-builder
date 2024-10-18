@@ -21,9 +21,7 @@ pub fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> Vec<TokenS
     let mut res = Vec::new();
     res.push(builder::run(graph, map));
     res.push(builder_states::run(graph, map));
-    // if let Some(builder_build_impl) = builder_build_impl::run(&graph, &map) {
-    //     res.push(builder_build_impl);
-    // }
+
     res
 }
 
@@ -125,11 +123,6 @@ mod builder {
                     quote! {
                         #vis struct #ident ();
                     }
-                }
-            }
-            (StructType::Unit, _) => {
-                quote! {
-                    #vis struct #ident;
                 }
             }
         }

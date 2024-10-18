@@ -158,7 +158,6 @@ impl std::fmt::Debug for StructElement {
 pub enum StructType {
     Named,
     Unnamed,
-    Unit,
 }
 
 #[derive(Debug, PartialEq)]

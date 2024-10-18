@@ -130,8 +130,7 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
             add_from_list!(graph, map, fields, Field, FieldTrain);
         }
         Fields::Unit => {
-            let ix = graph.add_node(StructElement::Type(StructType::Unit));
-            map.insert(mapkey::uniq::TYPE.to_string(), ix);
+            panic!("Since it does not need to be built, Unit Struct Type is not supported.")
         }
     }
 
