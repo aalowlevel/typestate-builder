@@ -18,11 +18,11 @@ use proc_macro2::TokenStream as TokenStream2;
 use crate::graph::StructGraph;
 
 pub fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> Vec<TokenStream2> {
-    let mut res = Vec::new();
-    res.push(builder::run(graph, map));
-    res.push(builder_states::run(graph, map));
-
-    res
+    vec![
+        builder::run(graph, map),
+        builder_states::run(graph, map),
+        builder_new_impl::run(graph, map),
+    ]
 }
 
 mod builder {
@@ -217,18 +217,102 @@ mod builder_states {
 }
 
 mod builder_new_impl {
+    use std::rc::Rc;
+
     use indexmap::IndexMap;
     use petgraph::graph::NodeIndex;
     use proc_macro2::TokenStream as TokenStream2;
     use quote::quote;
 
-    use crate::graph::StructGraph;
+    use crate::graph::{mapkey, msg, traverse, StructElement, StructGraph, StructRelation};
 
-    pub(super) fn run(
-        graph: &StructGraph,
-        map: &IndexMap<String, NodeIndex>,
-    ) -> Option<TokenStream2> {
-        Some(quote! {})
+    pub(super) fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> TokenStream2 {
+        let Some(ix) = map.get(mapkey::uniq::IDENT) else {
+            panic!("{}", msg::ix::IDENT);
+        };
+        let StructElement::Ident(ident) = &graph[*ix] else {
+            panic!("{}", msg::node::IDENT);
+        };
+        let Some(ix) = map.get(mapkey::uniq::VIS) else {
+            panic!("{}", msg::ix::VIS);
+        };
+        let StructElement::Visibility(vis) = &graph[*ix] else {
+            panic!("{}", msg::node::VIS);
+        };
+
+        let generics = map.get(mapkey::startp::GENERICS).map(|start| {
+            let generics = traverse(
+                graph,
+                Some(&[&StructRelation::GenericTrain]),
+                *start,
+                true,
+                |graph, _edge, node_generic| {
+                    let StructElement::Generic(generic) = &graph[node_generic] else {
+                        panic!("{}", msg::node::GENERIC);
+                    };
+                    Rc::clone(&generic.syn)
+                },
+            );
+            if !generics.is_empty() {
+                /* 🌀 COMPLEXITY #CP27010317 Using syn::GenericParam for the first declaration is OK.
+                However, There are some examples for the second part usage:
+                - Ident of const generics must be used. For example: impl<const N: usize> Foo<N>.
+                - Associated Item Constraints are not allowed here. For example: impl<T: Action> Dispatcher<T>
+                This means that both the first and second parts must be differentiated. */
+                let mut first = Vec::with_capacity(generics.len());
+                let mut second = Vec::with_capacity(generics.len());
+                for generic in generics {
+                    first.push(quote! { #generic });
+                    match generic.as_ref() {
+                        syn::GenericParam::Lifetime(lifetime_param) => {
+                            let lt = &lifetime_param.lifetime;
+                            second.push(quote! { #lt });
+                        }
+                        syn::GenericParam::Type(type_param) => {
+                            let ident = &type_param.ident;
+                            second.push(quote! { #ident });
+                        }
+                        syn::GenericParam::Const(const_param) => {
+                            let ident = &const_param.ident;
+                            second.push(quote! { #ident });
+                        }
+                    }
+                }
+                (quote! { <#(#first),*> }, quote! { <#(#second),*> })
+            } else {
+                (quote! {}, quote! {})
+            }
+        });
+        let (first, second) = match generics {
+            Some((first, second)) => (Some(first), Some(second)),
+            None => (None, None),
+        };
+
+        let where_clause = map.get(mapkey::startp::WP).map(|start| {
+            let wps = traverse(
+                graph,
+                Some(&[&StructRelation::WherePredicateTrain]),
+                *start,
+                true,
+                |graph, _edge, node_wp| {
+                    let StructElement::WherePredicate(wp) = &graph[node_wp] else {
+                        panic!("{}", msg::node::WP);
+                    };
+                    Rc::clone(&wp.syn)
+                },
+            );
+            if !wps.is_empty() {
+                quote! { where #(#wps),* }
+            } else {
+                quote! {}
+            }
+        });
+
+        quote! {
+            impl #first #ident #second #where_clause {
+                #vis fn builder() {}
+            }
+        }
     }
 }
 
