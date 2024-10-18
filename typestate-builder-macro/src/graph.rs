@@ -41,6 +41,8 @@ pub mod msg {
     pub mod ix {
         pub const IDENT: &str = "There must be ident node.";
         pub const BUILDER_IDENT: &str = "There must be builder ident node.";
+        pub const VIS: &str = "There must be visibility node.";
+        pub const TYPE: &str = "There must be type node.";
     }
     pub mod node {
         pub const VIS: &str = "Node must be a visibility.";
@@ -573,7 +575,6 @@ impl Serialize for BuilderStateAdded {
         res.end()
     }
 }
-
 pub fn traverse<'a, N, E, F, R>(
     graph: &'a Graph<N, E>,
     filter_edge: Option<&'a [&'a E]>,
@@ -597,23 +598,28 @@ where
 
     while let Some(node) = queue.pop_front() {
         if visited.insert(node) {
-            let neighbors: Vec<_> = graph
+            let mut neighbors: Vec<_> = graph
                 .neighbors(node)
-                .filter_map(|neighbor| {
-                    graph.find_edge(node, neighbor).and_then(|edge| {
-                        if let Some(filter_edge) = filter_edge {
-                            filter_edge
-                                .iter()
-                                .find(|&&p| p == &graph[edge])
-                                .map(|_| (edge, neighbor))
-                        } else {
-                            Some((edge, neighbor))
-                        }
-                    })
-                })
+                .filter_map(|neighbor| graph.find_edge(node, neighbor).map(|edge| (edge, neighbor)))
                 .collect();
 
+            // Sort neighbors based on filter_edge order
+            if let Some(filter_edge) = filter_edge {
+                neighbors.sort_by_key(|&(edge, _)| {
+                    filter_edge
+                        .iter()
+                        .position(|&p| p == &graph[edge])
+                        .unwrap_or(usize::MAX)
+                });
+            }
+
             for (edge, neighbor) in neighbors {
+                if let Some(filter_edge) = filter_edge {
+                    if !filter_edge.contains(&&graph[edge]) {
+                        continue;
+                    }
+                }
+
                 let result = node_action(graph, Some(edge), neighbor);
                 results.push(result);
                 if !visited.contains(&neighbor) {
@@ -624,7 +630,6 @@ where
     }
     results
 }
-
 pub fn traverse_mut<'a, N, E, F, R>(
     graph: &'a mut Graph<N, E>,
     filter_edge: Option<&'a [&'a E]>,
@@ -648,23 +653,28 @@ where
 
     while let Some(node) = queue.pop_front() {
         if visited.insert(node) {
-            let neighbors: Vec<_> = graph
+            let mut neighbors: Vec<_> = graph
                 .neighbors(node)
-                .filter_map(|neighbor| {
-                    graph.find_edge(node, neighbor).and_then(|edge| {
-                        if let Some(filter_edge) = filter_edge {
-                            filter_edge
-                                .iter()
-                                .find(|&&p| p == &graph[edge])
-                                .map(|_| (edge, neighbor))
-                        } else {
-                            Some((edge, neighbor))
-                        }
-                    })
-                })
+                .filter_map(|neighbor| graph.find_edge(node, neighbor).map(|edge| (edge, neighbor)))
                 .collect();
 
+            // Sort neighbors based on filter_edge order
+            if let Some(filter_edge) = filter_edge {
+                neighbors.sort_by_key(|&(edge, _)| {
+                    filter_edge
+                        .iter()
+                        .position(|&p| p == &graph[edge])
+                        .unwrap_or(usize::MAX)
+                });
+            }
+
             for (edge, neighbor) in neighbors {
+                if let Some(filter_edge) = filter_edge {
+                    if !filter_edge.contains(&&graph[edge]) {
+                        continue;
+                    }
+                }
+
                 let result = node_action(graph, Some(edge), neighbor);
                 results.push(result);
                 if !visited.contains(&neighbor) {

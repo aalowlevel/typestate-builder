@@ -37,7 +37,7 @@ mod builder {
     use proc_macro2::TokenStream as TokenStream2;
     use quote::quote;
 
-    use crate::graph::{mapkey, msg, StructElement, StructGraph};
+    use crate::graph::{mapkey, msg, StructElement, StructGraph, StructType};
 
     pub(super) fn run(
         graph: &StructGraph,
@@ -49,8 +49,32 @@ mod builder {
         let StructElement::BuilderIdent(ident) = &graph[*ix] else {
             panic!("{}", msg::node::IDENT);
         };
+        let Some(ix) = map.get(mapkey::uniq::VIS) else {
+            panic!("{}", msg::ix::VIS);
+        };
+        let StructElement::Visibility(vis) = &graph[*ix] else {
+            panic!("{}", msg::node::VIS);
+        };
+        let Some(ix) = map.get(mapkey::uniq::TYPE) else {
+            panic!("{}", msg::ix::TYPE);
+        };
+        let StructElement::Type(ty) = &graph[*ix] else {
+            panic!("{}", msg::node::TYPE);
+        };
 
-        Some(quote! {})
+        Some(match ty {
+            StructType::Named => {
+                quote! {
+                    #vis struct #ident
+                }
+            }
+            StructType::Unnamed => {
+                quote! {}
+            }
+            StructType::Unit => {
+                quote! {}
+            }
+        })
     }
 }
 
