@@ -56,6 +56,9 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
         #(#res)*
     };
 
-    write_graph_to_file(&graph, "example.dot").unwrap();
+    #[cfg(debug_assertions)]
+    {
+        write_graph_to_file(&graph, "example.dot").unwrap();
+    }
     output.into()
 }

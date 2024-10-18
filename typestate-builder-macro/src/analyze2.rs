@@ -218,15 +218,17 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
 
             /* ✅ #TD51147690 Add nodes and the pair edge. */
             let ty = ty.clone();
-            let ix_state_empty = graph.add_node(StructElement::BuilderStateEmpty(ident_empty));
-            let ix_state_added =
-                graph.add_node(StructElement::BuilderStateAdded(BuilderStateAdded {
+            let ix_state_empty =
+                graph.add_node(StructElement::BuilderStateEmpty(Rc::new(ident_empty)));
+            let ix_state_added = graph.add_node(StructElement::BuilderStateAdded(Rc::new(
+                BuilderStateAdded {
                     ident: ident_added,
                     generics,
                     ty,
                     where_predicates,
                     phantoms,
-                }));
+                },
+            )));
             graph.add_edge(
                 ix_state_empty,
                 ix_state_added,
@@ -280,7 +282,7 @@ struct FieldToWherePredicate {
 }
 
 struct BuilderStatePair<'a> {
-    main_ident: &'a syn::Ident,
+    main_ident: syn::Ident,
     ident: Cow<'a, syn::Ident>,
     ty: &'a syn::Type,
     field_to_main_lifetimes: Vec<Rc<syn::GenericParam>>,
@@ -301,6 +303,7 @@ impl<'a> BuilderStatePair<'a> {
         let Some(StructElement::Ident(main_ident)) = map.get("Ident").map(|f| &graph[*f]) else {
             panic!("Struct must have an ident.");
         };
+        let main_ident = format_ident!("{}Builder", main_ident);
         let ident = if let Some(ident) = &field.syn.ident {
             Cow::Borrowed(ident)
         } else {
