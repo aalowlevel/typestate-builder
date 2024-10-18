@@ -19,9 +19,8 @@ use crate::graph::StructGraph;
 
 pub fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> Vec<TokenStream2> {
     let mut res = Vec::new();
-    if let Some(builder) = builder::run(graph, map) {
-        res.push(builder);
-    }
+    res.push(builder::run(graph, map));
+
     // if let Some(builder_states) = builder_states::run(&graph, &map) {
     //     res.extend(builder_states);
     // }
@@ -32,17 +31,18 @@ pub fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> Vec<TokenS
 }
 
 mod builder {
+    use std::rc::Rc;
+
     use indexmap::IndexMap;
     use petgraph::graph::NodeIndex;
     use proc_macro2::TokenStream as TokenStream2;
     use quote::quote;
 
-    use crate::graph::{mapkey, msg, StructElement, StructGraph, StructType};
+    use crate::graph::{
+        mapkey, msg, traverse, StructElement, StructGraph, StructRelation, StructType,
+    };
 
-    pub(super) fn run(
-        graph: &StructGraph,
-        map: &IndexMap<String, NodeIndex>,
-    ) -> Option<TokenStream2> {
+    pub(super) fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> TokenStream2 {
         let Some(ix) = map.get(mapkey::uniq::BUILDER_IDENT) else {
             panic!("{}", msg::ix::BUILDER_IDENT);
         };
@@ -62,19 +62,80 @@ mod builder {
             panic!("{}", msg::node::TYPE);
         };
 
-        Some(match ty {
-            StructType::Named => {
-                quote! {
-                    #vis struct #ident
+        let data = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
+            enum IdentType {
+                Field(Rc<syn::Ident>),
+                Generic(Rc<syn::Ident>),
+            }
+            let action = |graph: &StructGraph, _edge, builder_node| match &graph[builder_node] {
+                StructElement::BuilderField(ident) => IdentType::Field(Rc::clone(ident)),
+                StructElement::BuilderGeneric(ident) => IdentType::Generic(Rc::clone(ident)),
+                _ => panic!("Node cannot be other than builder field or generic."),
+            };
+
+            /* ⚠️ WARNING #WR04864549 Order-sensitive graph traversal function call. */
+            let idents = traverse(
+                graph,
+                Some(&[
+                    &StructRelation::BuilderFieldToBuilderGeneric,
+                    &StructRelation::BuilderFieldTrain,
+                ]),
+                *start,
+                true,
+                action,
+            );
+
+            /* ✅ #TD04832691 Reduction. */
+            let mut fields = Vec::with_capacity(idents.len());
+            let mut generics = Vec::with_capacity(idents.len());
+            for ident in idents {
+                match ident {
+                    IdentType::Field(rc) => fields.push(rc),
+                    IdentType::Generic(rc) => generics.push(rc),
                 }
             }
-            StructType::Unnamed => {
-                quote! {}
+            (fields, generics)
+        });
+
+        match (ty, data) {
+            (StructType::Named, data) => {
+                if let Some((fields, generics)) = data {
+                    let fields_ts = fields
+                        .iter()
+                        .enumerate()
+                        .map(|(i, field)| {
+                            let ty = &generics[i];
+                            quote! { #field: #ty }
+                        })
+                        .collect::<Vec<_>>();
+                    quote! {
+                        #vis struct #ident <#(#generics),*> {
+                            #(#fields_ts),*
+                        }
+                    }
+                } else {
+                    quote! {
+                        #vis struct #ident {}
+                    }
+                }
             }
-            StructType::Unit => {
-                quote! {}
+            (StructType::Unnamed, data) => {
+                if let Some((_, generics)) = data {
+                    quote! {
+                        #vis struct #ident <#(#generics),*> (#(#generics),*);
+                    }
+                } else {
+                    quote! {
+                        #vis struct #ident ();
+                    }
+                }
             }
-        })
+            (StructType::Unit, _) => {
+                quote! {
+                    #vis struct #ident;
+                }
+            }
+        }
     }
 }
 

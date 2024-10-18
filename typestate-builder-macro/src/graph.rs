@@ -65,9 +65,9 @@ pub enum StructElement {
     Type(StructType),
     BuilderStateEmpty(syn::Ident),
     BuilderStateAdded(BuilderStateAdded),
-    BuilderIdent(syn::Ident),
-    BuilderField(syn::Ident),
-    BuilderGeneric(syn::Ident),
+    BuilderIdent(Rc<syn::Ident>),
+    BuilderField(Rc<syn::Ident>),
+    BuilderGeneric(Rc<syn::Ident>),
 }
 
 impl Serialize for StructElement {

@@ -40,7 +40,7 @@ fn create_builder(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>
         panic!("{}", msg::node::IDENT);
     };
     let ident = format_ident!("{}Builder", ident);
-    let ix_builder = graph.add_node(StructElement::BuilderIdent(ident));
+    let ix_builder = graph.add_node(StructElement::BuilderIdent(Rc::new(ident)));
     map.insert(mapkey::uniq::BUILDER_IDENT.to_string(), ix_builder);
 
     if let Some(ix) = map.get(mapkey::startp::FIELD) {
@@ -73,7 +73,7 @@ fn create_builder(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>
         let mut predecessor_ident_tc = None;
         for (i, (field_node, ident, ident_tc)) in builder_data.into_iter().enumerate() {
             /* ✅ #TD72341053 Field */
-            let successor_field = graph.add_node(StructElement::BuilderField(ident));
+            let successor_field = graph.add_node(StructElement::BuilderField(Rc::new(ident)));
             if let Some(predecessor) = predecessor_ident.take() {
                 graph.add_edge(
                     predecessor,
@@ -92,7 +92,8 @@ fn create_builder(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>
             );
 
             /* ✅ #TD45099623 Generic */
-            let successor_generic = graph.add_node(StructElement::BuilderGeneric(ident_tc));
+            let successor_generic =
+                graph.add_node(StructElement::BuilderGeneric(Rc::new(ident_tc)));
             if let Some(predecessor) = predecessor_ident_tc.take() {
                 graph.add_edge(
                     predecessor,
