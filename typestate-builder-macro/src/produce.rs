@@ -480,16 +480,28 @@ mod builder_impl {
         let impl_blocks = collections.map(|(fields, generics, empties, addeds)| {
             let mut impl_blocks = Vec::with_capacity(fields.len());
             for (i0, field) in fields.iter().enumerate() {
-                let generics_first = generics
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i1, f)| if i0 == i1 { None } else { Some(Rc::clone(f)) })
-                    .collect::<Vec<_>>();
+                let mut generics_first = Vec::with_capacity(generics.len());
+
+                /* ✍️ TODO #TD01393891 Add generics from added state type. */
+                let iter = addeds[i0].generics.iter().map(|f| quote! { #f });
+                generics_first.extend(iter);
+
+                /* ✍️ TODO #TD26648840 Necessary generics for impl block. */
+                let iter = generics.iter().enumerate().filter_map(|(i1, f)| {
+                    if i0 == i1 {
+                        None
+                    } else {
+                        Some(quote! { #f })
+                    }
+                });
+                generics_first.extend(iter);
+
                 let generics_first = if !generics_first.is_empty() {
                     quote! { <#(#generics_first),*> }
                 } else {
                     quote! {}
                 };
+
                 let generics_second = generics
                     .iter()
                     .enumerate()
@@ -506,14 +518,29 @@ mod builder_impl {
                 } else {
                     quote! {}
                 };
+
+                let where_clause = if !addeds[i0].where_predicates.is_empty() {
+                    let where_predicates = &addeds[i0].where_predicates;
+                    quote! { where #(#where_predicates),* }
+                } else {
+                    quote! {}
+                };
+
                 let generics_result = generics
                     .iter()
                     .enumerate()
                     .map(|(i1, f)| {
                         if i0 == i1 {
-                            &addeds[i1].ident
+                            let ident = &addeds[i1].ident;
+                            let generics = if !addeds[i1].generics.is_empty() {
+                                let generics = &addeds[i1].generics;
+                                quote! { <#(#generics),*> }
+                            } else {
+                                quote! {}
+                            };
+                            quote! { #ident #generics }
                         } else {
-                            f.as_ref()
+                            quote! { #f }
                         }
                     })
                     .collect::<Vec<_>>();
@@ -522,10 +549,12 @@ mod builder_impl {
                 } else {
                     quote! {}
                 };
+
                 let param = {
                     let added_type = &addeds[i0].ty;
                     quote! { #field: #added_type }
                 };
+
                 let constructor_data = match ty {
                     StructType::Named => {
                         let fields = fields
@@ -565,7 +594,7 @@ mod builder_impl {
                 };
 
                 impl_blocks.push(quote! {
-                    impl #generics_first #builder_ident #generics_second {
+                    impl #generics_first #builder_ident #generics_second #where_clause {
                         #vis fn #field(self, #param) -> #builder_ident #generics_result {
                             #builder_ident #constructor_data
                         }
