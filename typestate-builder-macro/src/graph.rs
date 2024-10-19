@@ -18,6 +18,7 @@ use petgraph::{
     graph::{EdgeIndex, NodeIndex},
     Graph,
 };
+use proc_macro2::TokenStream as TokenStream2;
 use quote::ToTokens;
 use serde::{ser::SerializeStruct, Serialize};
 use serde_json::json;
@@ -561,7 +562,7 @@ pub struct BuilderStateAdded {
     pub generics: Vec<Rc<syn::GenericParam>>,
     pub ty: syn::Type,
     pub where_predicates: Vec<syn::WherePredicate>,
-    pub phantoms: Vec<Rc<syn::GenericParam>>,
+    pub phantoms: Vec<TokenStream2>,
 }
 
 impl Serialize for BuilderStateAdded {

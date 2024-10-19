@@ -16,7 +16,7 @@ use std::{borrow::Cow, rc::Rc};
 use indexmap::IndexMap;
 use petgraph::graph::{EdgeIndex, NodeIndex};
 use proc_macro2::Span;
-use quote::format_ident;
+use quote::{format_ident, quote};
 
 use crate::{
     graph::{
@@ -206,7 +206,7 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
                         })
                         .collect::<Vec<_>>();
                     for phantom in filter.iter() {
-                        phantoms.push(Rc::clone(phantom));
+                        phantoms.push(quote! { std::marker::PhantomData<#phantom> });
                     }
                     generics_additions.extend(filter);
                 }
