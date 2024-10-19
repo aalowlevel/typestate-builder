@@ -56,7 +56,8 @@ fn create_builder(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>
                 .map(|f| f.to_string())
                 .unwrap_or_else(|| format!("field{}", field.nth));
             let ident = syn::Ident::new(&ident_str, Span::call_site());
-            let ident_tc_str = to_titlecase(&ident_str);
+            let mut ident_tc_str = to_titlecase(&ident_str);
+            ident_tc_str.push_str("GenericParam");
             let ident_tc = syn::Ident::new(&ident_tc_str, Span::call_site());
             (field_node, ident, ident_tc)
         };
