@@ -23,6 +23,7 @@ pub fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> Vec<TokenS
         builder_states::run(graph, map),
         builder_new_impl::run(graph, map),
         builder_impl::run(graph, map),
+        builder_build_impl::run(graph, map),
     ]
 }
 
@@ -151,6 +152,7 @@ mod builder_states {
         };
 
         if let Some(start) = map.get(mapkey::startp::BUILDER_FIELD) {
+            /* ♻️ REFACTOR #RF52666407 Remove enum. Match directly. */
             enum PairType {
                 Empty(Rc<syn::Ident>),
                 Added(Rc<BuilderStateAdded>),
@@ -645,17 +647,110 @@ mod builder_impl {
 }
 
 mod builder_build_impl {
+    use std::rc::Rc;
+
     use indexmap::IndexMap;
     use petgraph::graph::NodeIndex;
     use proc_macro2::TokenStream as TokenStream2;
     use quote::quote;
 
-    use crate::graph::StructGraph;
+    use crate::graph::{
+        mapkey, msg, traverse, StructElement, StructGraph, StructRelation, StructType,
+    };
 
-    pub(super) fn run(
-        graph: &StructGraph,
-        map: &IndexMap<String, NodeIndex>,
-    ) -> Option<TokenStream2> {
-        Some(quote! {})
+    pub(super) fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> TokenStream2 {
+        let Some(ix) = map.get(mapkey::uniq::IDENT) else {
+            panic!("{}", msg::ix::IDENT);
+        };
+        let StructElement::Ident(ident) = &graph[*ix] else {
+            panic!("{}", msg::node::IDENT);
+        };
+        let Some(ix) = map.get(mapkey::uniq::BUILDER_IDENT) else {
+            panic!("{}", msg::ix::BUILDER_IDENT);
+        };
+        let StructElement::BuilderIdent(builder_ident) = &graph[*ix] else {
+            panic!("{}", msg::node::BUILDER_IDENT);
+        };
+        let Some(ix) = map.get(mapkey::uniq::VIS) else {
+            panic!("{}", msg::ix::VIS);
+        };
+        let StructElement::Visibility(vis) = &graph[*ix] else {
+            panic!("{}", msg::node::VIS);
+        };
+        let Some(ix) = map.get(mapkey::uniq::TYPE) else {
+            panic!("{}", msg::ix::TYPE);
+        };
+        let StructElement::Type(ty) = &graph[*ix] else {
+            panic!("{}", msg::node::TYPE);
+        };
+
+        let collections = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
+            let mut fields = Vec::new();
+            let mut addeds = Vec::new();
+            let action =
+                |graph: &StructGraph, _edge, node_builder_field| match &graph[node_builder_field] {
+                    StructElement::BuilderStateAdded(rc) => {
+                        addeds.push(Rc::clone(rc));
+                    }
+                    StructElement::BuilderField(rc) => {
+                        fields.push(Rc::clone(rc));
+                    }
+                    _ => {}
+                };
+            traverse(
+                graph,
+                Some(&[
+                    &StructRelation::BuilderStatePair,
+                    &StructRelation::BuilderFieldToBuilderState,
+                    &StructRelation::BuilderFieldTrain,
+                ]),
+                *start,
+                true,
+                action,
+            );
+            let fields = fields
+                .into_iter()
+                .map(|field| {
+                    quote! { #field: self.#field.0 }
+                })
+                .collect::<Vec<_>>();
+            let addeds = if !addeds.is_empty() {
+                let addeds = addeds
+                    .into_iter()
+                    .map(|f| {
+                        let ident = &f.ident;
+                        quote! { #ident }
+                    })
+                    .collect::<Vec<_>>();
+                quote! { <#(#addeds),*> }
+            } else {
+                quote! {}
+            };
+            (fields, addeds)
+        });
+
+        match (ty, collections) {
+            (StructType::Named, Some((fields, addeds))) => {
+                quote! {
+                    impl #builder_ident #addeds {
+                        #vis fn build(self) -> #ident {
+                            #ident {
+                                #(#fields),*
+                            }
+                        }
+                    }
+                }
+            }
+            (StructType::Unnamed, Some((fields, addeds))) => {
+                quote! {
+                    impl #builder_ident #addeds {
+                        #vis fn build(self) -> #ident {
+                            #ident ( #(#fields),* )
+                        }
+                    }
+                }
+            }
+            _ => quote! {},
+        }
     }
 }
