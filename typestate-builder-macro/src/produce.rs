@@ -480,18 +480,18 @@ mod builder_impl {
         let impl_blocks = collections.map(|(fields, generics, empties, addeds)| {
             let mut impl_blocks = Vec::with_capacity(fields.len());
             for (i0, field) in fields.iter().enumerate() {
-                let generics_first = generics
+                let gfirst = generics
                     .iter()
                     .enumerate()
                     .filter_map(|(i1, f)| if i0 == i1 { None } else { Some(Rc::clone(f)) })
                     .collect::<Vec<_>>();
-                let gfirst = if !generics_first.is_empty() {
-                    quote! { <#(#generics_first),*> }
+                let gfirst = if !gfirst.is_empty() {
+                    quote! { <#(#gfirst),*> }
                 } else {
                     quote! {}
                 };
 
-                let generics_second = generics
+                let gsecond = generics
                     .iter()
                     .enumerate()
                     .map(|(i1, f)| {
@@ -502,8 +502,8 @@ mod builder_impl {
                         }
                     })
                     .collect::<Vec<_>>();
-                let gsecond = if !generics_second.is_empty() {
-                    quote! { <#(#generics_second),*> }
+                let gsecond = if !gsecond.is_empty() {
+                    quote! { <#(#gsecond),*> }
                 } else {
                     quote! {}
                 };
@@ -527,7 +527,24 @@ mod builder_impl {
                         if i0 == i1 {
                             let ident = &addeds[i1].ident;
                             let generics = if !addeds[i1].generics.is_empty() {
-                                let generics = &addeds[i1].generics;
+                                let generics = &addeds[i1]
+                                    .generics
+                                    .iter()
+                                    .map(|generic| match generic.as_ref() {
+                                        syn::GenericParam::Lifetime(lifetime_param) => {
+                                            let lt = &lifetime_param.lifetime;
+                                            quote! { #lt }
+                                        }
+                                        syn::GenericParam::Type(type_param) => {
+                                            let ident = &type_param.ident;
+                                            quote! { #ident }
+                                        }
+                                        syn::GenericParam::Const(const_param) => {
+                                            let ident = &const_param.ident;
+                                            quote! { #ident }
+                                        }
+                                    })
+                                    .collect::<Vec<_>>();
                                 quote! { <#(#generics),*> }
                             } else {
                                 quote! {}
