@@ -480,23 +480,12 @@ mod builder_impl {
         let impl_blocks = collections.map(|(fields, generics, empties, addeds)| {
             let mut impl_blocks = Vec::with_capacity(fields.len());
             for (i0, field) in fields.iter().enumerate() {
-                let mut generics_first = Vec::with_capacity(generics.len());
-
-                /* ✍️ TODO #TD01393891 Add generics from added state type. */
-                let iter = addeds[i0].generics.iter().map(|f| quote! { #f });
-                generics_first.extend(iter);
-
-                /* ✍️ TODO #TD26648840 Necessary generics for impl block. */
-                let iter = generics.iter().enumerate().filter_map(|(i1, f)| {
-                    if i0 == i1 {
-                        None
-                    } else {
-                        Some(quote! { #f })
-                    }
-                });
-                generics_first.extend(iter);
-
-                let generics_first = if !generics_first.is_empty() {
+                let generics_first = generics
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i1, f)| if i0 == i1 { None } else { Some(Rc::clone(f)) })
+                    .collect::<Vec<_>>();
+                let gfirst = if !generics_first.is_empty() {
                     quote! { <#(#generics_first),*> }
                 } else {
                     quote! {}
@@ -513,17 +502,22 @@ mod builder_impl {
                         }
                     })
                     .collect::<Vec<_>>();
-                let generics_second = if !generics_second.is_empty() {
+                let gsecond = if !generics_second.is_empty() {
                     quote! { <#(#generics_second),*> }
                 } else {
                     quote! {}
                 };
 
-                let where_clause = if !addeds[i0].where_predicates.is_empty() {
-                    let where_predicates = &addeds[i0].where_predicates;
-                    quote! { where #(#where_predicates),* }
+                let gmethod = if !addeds[i0].generics.is_empty() {
+                    let generics = &addeds[i0].generics;
+                    quote! { <#(#generics),*> }
                 } else {
                     quote! {}
+                };
+
+                let param = {
+                    let added_type = &addeds[i0].ty;
+                    quote! { #field: #added_type }
                 };
 
                 let generics_result = generics
@@ -544,15 +538,17 @@ mod builder_impl {
                         }
                     })
                     .collect::<Vec<_>>();
-                let generics_result = if !generics_result.is_empty() {
+                let gresult = if !generics_result.is_empty() {
                     quote! { <#(#generics_result),*> }
                 } else {
                     quote! {}
                 };
 
-                let param = {
-                    let added_type = &addeds[i0].ty;
-                    quote! { #field: #added_type }
+                let whc = if !addeds[i0].where_predicates.is_empty() {
+                    let where_predicates = &addeds[i0].where_predicates;
+                    quote! { where #(#where_predicates),* }
+                } else {
+                    quote! {}
                 };
 
                 let constructor_data = match ty {
@@ -563,7 +559,17 @@ mod builder_impl {
                             .map(|(i1, field)| {
                                 if i0 == i1 {
                                     let added_ident = &addeds[i1].ident;
-                                    quote! { #field: #added_ident(#field) }
+                                    let phantoms = if !addeds[i1].phantoms.is_empty() {
+                                        let phantoms = &addeds[i1]
+                                            .phantoms
+                                            .iter()
+                                            .map(|_| quote! { std::marker::PhantomData })
+                                            .collect::<Vec<_>>();
+                                        quote! { , #(#phantoms),* }
+                                    } else {
+                                        quote! {}
+                                    };
+                                    quote! { #field: #added_ident(#field #phantoms) }
                                 } else {
                                     quote! { #field: self.#field }
                                 }
@@ -580,7 +586,17 @@ mod builder_impl {
                             .map(|(i1, field)| {
                                 if i0 == i1 {
                                     let added_ident = &addeds[i1].ident;
-                                    quote! { #added_ident(#field) }
+                                    let phantoms = if !addeds[i1].phantoms.is_empty() {
+                                        let phantoms = &addeds[i1]
+                                            .phantoms
+                                            .iter()
+                                            .map(|_| quote! { std::marker::PhantomData })
+                                            .collect::<Vec<_>>();
+                                        quote! { , #(#phantoms),* }
+                                    } else {
+                                        quote! {}
+                                    };
+                                    quote! { #field: #added_ident(#field #phantoms) }
                                 } else {
                                     let i = syn::Index::from(i1);
                                     quote! { self.#i }
@@ -594,8 +610,8 @@ mod builder_impl {
                 };
 
                 impl_blocks.push(quote! {
-                    impl #generics_first #builder_ident #generics_second #where_clause {
-                        #vis fn #field(self, #param) -> #builder_ident #generics_result {
+                    impl #gfirst #builder_ident #gsecond {
+                        #vis fn #field #gmethod(self, #param) -> #builder_ident #gresult #whc {
                             #builder_ident #constructor_data
                         }
                     }
