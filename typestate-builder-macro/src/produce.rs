@@ -551,39 +551,58 @@ mod builder_impl {
                     quote! {}
                 };
 
-                let fields_ts = || {
-                    fields
-                        .iter()
-                        .enumerate()
-                        .map(|(i1, field)| {
-                            if i0 == i1 {
-                                let added_ident = &addeds[i1].ident;
-                                let phantoms = if !addeds[i1].phantoms.is_empty() {
-                                    let phantoms = &addeds[i1]
-                                        .phantoms
-                                        .iter()
-                                        .map(|_| quote! { std::marker::PhantomData })
-                                        .collect::<Vec<_>>();
-                                    quote! { , #(#phantoms),* }
-                                } else {
-                                    quote! {}
-                                };
-                                quote! { #field: #added_ident(#field #phantoms) }
-                            } else {
-                                quote! { #field: self.#field }
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                };
                 let constructor_data = match ty {
                     StructType::Named => {
-                        let fields = fields_ts();
+                        let fields = fields
+                            .iter()
+                            .enumerate()
+                            .map(|(i1, field)| {
+                                if i0 == i1 {
+                                    let added_ident = &addeds[i1].ident;
+                                    let phantoms = if !addeds[i1].phantoms.is_empty() {
+                                        let phantoms = &addeds[i1]
+                                            .phantoms
+                                            .iter()
+                                            .map(|_| quote! { std::marker::PhantomData })
+                                            .collect::<Vec<_>>();
+                                        quote! { , #(#phantoms),* }
+                                    } else {
+                                        quote! {}
+                                    };
+                                    quote! { #field: #added_ident(#field #phantoms) }
+                                } else {
+                                    quote! { #field: self.#field }
+                                }
+                            })
+                            .collect::<Vec<_>>();
                         quote! {{
                             #(#fields),*
                         }}
                     }
                     StructType::Unnamed => {
-                        let fields = fields_ts();
+                        let fields = fields
+                            .iter()
+                            .enumerate()
+                            .map(|(i1, field)| {
+                                if i0 == i1 {
+                                    let added_ident = &addeds[i1].ident;
+                                    let phantoms = if !addeds[i1].phantoms.is_empty() {
+                                        let phantoms = &addeds[i1]
+                                            .phantoms
+                                            .iter()
+                                            .map(|_| quote! { std::marker::PhantomData })
+                                            .collect::<Vec<_>>();
+                                        quote! { , #(#phantoms),* }
+                                    } else {
+                                        quote! {}
+                                    };
+                                    quote! { #added_ident(#field, #phantoms) }
+                                } else {
+                                    let i = syn::Index::from(i1);
+                                    quote! { self.#i }
+                                }
+                            })
+                            .collect::<Vec<_>>();
                         quote! {(
                            #(#fields),*
                         )}
