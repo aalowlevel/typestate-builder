@@ -22,6 +22,7 @@ pub fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> Vec<TokenS
         builder::run(graph, map),
         builder_states::run(graph, map),
         builder_new_impl::run(graph, map),
+        builder_impl::run(graph, map),
     ]
 }
 
@@ -58,13 +59,13 @@ mod builder {
         };
 
         let data = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
-            enum IdentType {
+            enum ActionResult {
                 Field(Rc<syn::Ident>),
                 Generic(Rc<syn::Ident>),
             }
             let action = |graph: &StructGraph, _edge, builder_node| match &graph[builder_node] {
-                StructElement::BuilderField(ident) => IdentType::Field(Rc::clone(ident)),
-                StructElement::BuilderGeneric(ident) => IdentType::Generic(Rc::clone(ident)),
+                StructElement::BuilderField(ident) => ActionResult::Field(Rc::clone(ident)),
+                StructElement::BuilderGeneric(ident) => ActionResult::Generic(Rc::clone(ident)),
                 _ => panic!("Node cannot be other than builder field or generic."),
             };
 
@@ -85,8 +86,8 @@ mod builder {
             let mut generics = Vec::with_capacity(idents.len());
             for ident in idents {
                 match ident {
-                    IdentType::Field(rc) => fields.push(rc),
-                    IdentType::Generic(rc) => generics.push(rc),
+                    ActionResult::Field(rc) => fields.push(rc),
+                    ActionResult::Generic(rc) => generics.push(rc),
                 }
             }
             (fields, generics)
@@ -322,7 +323,7 @@ mod builder_new_impl {
             }
         });
 
-        let data = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
+        let collections = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
             let collected = traverse(
                 graph,
                 Some(&[
@@ -351,9 +352,9 @@ mod builder_new_impl {
             (fields, empties)
         });
 
-        match (ty, data) {
-            (StructType::Named, data) => {
-                if let Some((fields, empties)) = data {
+        match (ty, collections) {
+            (StructType::Named, collections) => {
+                if let Some((fields, empties)) = collections {
                     let return_type_generics = if !empties.is_empty() {
                         quote! { <#(#empties),*> }
                     } else {
@@ -417,18 +418,167 @@ mod builder_new_impl {
 }
 
 mod builder_impl {
+    use std::rc::Rc;
+
     use indexmap::IndexMap;
     use petgraph::graph::NodeIndex;
     use proc_macro2::TokenStream as TokenStream2;
     use quote::quote;
 
-    use crate::graph::StructGraph;
+    use crate::graph::{
+        mapkey, msg, traverse, StructElement, StructGraph, StructRelation, StructType,
+    };
 
-    pub(super) fn run(
-        graph: &StructGraph,
-        map: &IndexMap<String, NodeIndex>,
-    ) -> Option<TokenStream2> {
-        Some(quote! {})
+    pub(super) fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> TokenStream2 {
+        let Some(ix) = map.get(mapkey::uniq::BUILDER_IDENT) else {
+            panic!("{}", msg::ix::BUILDER_IDENT);
+        };
+        let StructElement::BuilderIdent(builder_ident) = &graph[*ix] else {
+            panic!("{}", msg::node::BUILDER_IDENT);
+        };
+        let Some(ix) = map.get(mapkey::uniq::VIS) else {
+            panic!("{}", msg::ix::VIS);
+        };
+        let StructElement::Visibility(vis) = &graph[*ix] else {
+            panic!("{}", msg::node::VIS);
+        };
+        let Some(ix) = map.get(mapkey::uniq::TYPE) else {
+            panic!("{}", msg::ix::TYPE);
+        };
+        let StructElement::Type(ty) = &graph[*ix] else {
+            panic!("{}", msg::node::TYPE);
+        };
+
+        let collections = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
+            let mut fields = Vec::new();
+            let mut generics = Vec::new();
+            let mut empties = Vec::new();
+            let mut addeds = Vec::new();
+            let action = |graph: &StructGraph, _edge, node| match &graph[node] {
+                StructElement::BuilderField(rc) => fields.push(Rc::clone(rc)),
+                StructElement::BuilderGeneric(rc) => generics.push(Rc::clone(rc)),
+                StructElement::BuilderStateEmpty(rc) => empties.push(Rc::clone(rc)),
+                StructElement::BuilderStateAdded(rc) => addeds.push(Rc::clone(rc)),
+                _ => {}
+            };
+            traverse(
+                graph,
+                Some(&[
+                    &StructRelation::BuilderStatePair,
+                    &StructRelation::BuilderFieldToBuilderState,
+                    &StructRelation::BuilderFieldToBuilderGeneric,
+                    &StructRelation::BuilderFieldTrain,
+                ]),
+                *start,
+                true,
+                action,
+            );
+            assert!(fields.len() == generics.len() && empties.len() == addeds.len());
+            (fields, generics, empties, addeds)
+        });
+
+        let impl_blocks = collections.map(|(fields, generics, empties, addeds)| {
+            let mut impl_blocks = Vec::with_capacity(fields.len());
+            for (i0, field) in fields.iter().enumerate() {
+                let generics_first = generics
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i1, f)| if i0 == i1 { None } else { Some(Rc::clone(f)) })
+                    .collect::<Vec<_>>();
+                let generics_first = if !generics_first.is_empty() {
+                    quote! { <#(#generics_first),*> }
+                } else {
+                    quote! {}
+                };
+                let generics_second = generics
+                    .iter()
+                    .enumerate()
+                    .map(|(i1, f)| {
+                        if i0 == i1 {
+                            Rc::clone(&empties[i1])
+                        } else {
+                            Rc::clone(f)
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let generics_second = if !generics_second.is_empty() {
+                    quote! { <#(#generics_second),*> }
+                } else {
+                    quote! {}
+                };
+                let generics_result = generics
+                    .iter()
+                    .enumerate()
+                    .map(|(i1, f)| {
+                        if i0 == i1 {
+                            &addeds[i1].ident
+                        } else {
+                            f.as_ref()
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let generics_result = if !generics_result.is_empty() {
+                    quote! { <#(#generics_result),*> }
+                } else {
+                    quote! {}
+                };
+                let param = {
+                    let added_type = &addeds[i0].ty;
+                    quote! { #field: #added_type }
+                };
+                let constructor_data = match ty {
+                    StructType::Named => {
+                        let fields = fields
+                            .iter()
+                            .enumerate()
+                            .map(|(i1, field)| {
+                                if i0 == i1 {
+                                    let added_ident = &addeds[i1].ident;
+                                    quote! { #field: #added_ident(#field) }
+                                } else {
+                                    quote! { #field: self.#field }
+                                }
+                            })
+                            .collect::<Vec<_>>();
+                        quote! {{
+                            #(#fields),*
+                        }}
+                    }
+                    StructType::Unnamed => {
+                        let fields = fields
+                            .iter()
+                            .enumerate()
+                            .map(|(i1, field)| {
+                                if i0 == i1 {
+                                    let added_ident = &addeds[i1].ident;
+                                    quote! { #added_ident(#field) }
+                                } else {
+                                    let i = syn::Index::from(i1);
+                                    quote! { self.#i }
+                                }
+                            })
+                            .collect::<Vec<_>>();
+                        quote! {(
+                           #(#fields),*
+                        )}
+                    }
+                };
+
+                impl_blocks.push(quote! {
+                    impl #generics_first #builder_ident #generics_second {
+                        #vis fn #field(self, #param) -> #builder_ident #generics_result {
+                            #builder_ident #constructor_data
+                        }
+                    }
+                });
+            }
+            impl_blocks
+        });
+        if let Some(impl_blocks) = impl_blocks {
+            quote! { #(#impl_blocks)* }
+        } else {
+            quote! {}
+        }
     }
 }
 
