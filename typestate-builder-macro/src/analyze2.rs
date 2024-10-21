@@ -23,7 +23,7 @@ use crate::{
         mapkey, msg, traverse, traverse_mut, BuilderStateAdded, StructElement, StructGraph,
         StructRelation,
     },
-    helper::to_titlecase,
+    helper::string::{rand_lowercase, to_titlecase},
 };
 
 pub fn run(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>) {
@@ -148,14 +148,18 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
             /* ✅ #TD13775189 Phantoms init */
             let mut phantoms = Vec::with_capacity(field_to_where_predicates.len());
 
+            /* ✍️ TODO #TD11319653 Higher-Ranked Trait Bounds init. */
+            let mut hrtb = None;
+
             /* ✅ #TD18715806 Determining where predicates related to the field. */
             let mut where_predicates = Vec::with_capacity(field_to_where_predicates.len());
             for field_to_where_predicate in field_to_where_predicates {
                 let mut predicate = (*field_to_where_predicate.wp).clone();
 
                 /* 🌀 COMPLEXITY #CP60692702 Orphan wp right lifetimes. Add Higher-ranked trait bounds for them (ForLifetimes). */
+                /* 🐞 BUG #BG46782643 Register Higher-ranked trait bound when it's used. */
                 {
-                    let filter = field_to_where_predicate
+                    let orphan_lts = field_to_where_predicate
                         .right_lifetimes_in_generics
                         .into_iter()
                         .filter(|p0| {
@@ -169,12 +173,14 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
                     match &mut predicate {
                         syn::WherePredicate::Lifetime(_predicate_lifetime) => unimplemented!(),
                         syn::WherePredicate::Type(predicate_type) => {
-                            if let Some(ptyb) = &mut predicate_type.lifetimes {
-                                ptyb.lifetimes.extend(filter);
-                            } else if !filter.is_empty() {
-                                let mut lts = syn::BoundLifetimes::default();
-                                lts.lifetimes.extend(filter);
-                                predicate_type.lifetimes = Some(lts);
+                            if let Some(blts) = &mut predicate_type.lifetimes {
+                                blts.lifetimes.extend(orphan_lts.clone());
+                                hrtb = Some(orphan_lts);
+                            } else if !orphan_lts.is_empty() {
+                                let mut new_hrtb = syn::BoundLifetimes::default();
+                                new_hrtb.lifetimes.extend(orphan_lts.clone());
+                                predicate_type.lifetimes = Some(new_hrtb);
+                                hrtb = Some(orphan_lts);
                             }
                         }
                         _ => unimplemented!(),
@@ -213,7 +219,7 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
                 }
 
                 /* ✅ #TD60868169 Finally push produced predicate. */
-                where_predicates.push(predicate);
+                where_predicates.push(Rc::new(predicate));
             }
 
             /* ✅ #TD76108810 Determining main generics related to the field. */
@@ -233,6 +239,7 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
                     ty,
                     where_predicates,
                     phantoms,
+                    hrtb,
                 },
             )));
             graph.add_edge(
@@ -264,6 +271,17 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
             true,
             action,
         );
+    }
+}
+
+fn rename_orphan_lts(orphan_lts: &mut [syn::GenericParam]) {
+    for orphan_lt in orphan_lts.iter_mut() {
+        if let syn::GenericParam::Lifetime(lifetime_param) = orphan_lt {
+            let mut new_lt_ident = String::new();
+            new_lt_ident.push('\'');
+            rand_lowercase(8, &mut new_lt_ident);
+            lifetime_param.lifetime = syn::Lifetime::new(&new_lt_ident, Span::call_site());
+        }
     }
 }
 

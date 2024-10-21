@@ -727,21 +727,39 @@ mod builder_build_impl {
             None => (None, None),
         };
 
-        let where_clause = map.get(mapkey::startp::WP).map(|start| {
-            let wp = traverse(
+        /* 🐞 BUG #BG46782643 Recieve wp's from added. When Higher-ranked trait bounds are used, rename each parameter to distinguish it from the others. */
+        let where_clause = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
+            let addeds = traverse(
                 graph,
-                Some(&[&StructRelation::WherePredicateTrain]),
+                Some(&[
+                    &StructRelation::BuilderStatePair,
+                    &StructRelation::BuilderFieldToBuilderState,
+                    &StructRelation::BuilderFieldTrain,
+                ]),
                 *start,
                 true,
-                |graph, _edge, node_wp| {
-                    let StructElement::WherePredicate(wp) = &graph[node_wp] else {
-                        panic!("{}", msg::node::WP);
-                    };
-                    Rc::clone(&wp.syn)
+                |graph, _edge, node| {
+                    if let StructElement::BuilderStateAdded(rc) = &graph[node] {
+                        Some(Rc::clone(rc))
+                    } else {
+                        None
+                    }
                 },
             );
-            if !wp.is_empty() {
-                quote! { where #(#wp),* }
+            let wps = addeds
+                .into_iter()
+                .flatten()
+                .flat_map(|added| {
+                    added
+                        .where_predicates
+                        .iter()
+                        .map(Rc::clone)
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+
+            if !wps.is_empty() {
+                quote! { where #(#wps),* }
             } else {
                 quote! {}
             }

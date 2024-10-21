@@ -56,15 +56,31 @@ pub fn write_graph_to_file<N: std::fmt::Debug, E: std::fmt::Debug>(
     Ok(())
 }
 
-pub fn to_titlecase(string: &str) -> String {
-    string
-        .split('_')
-        .map(|word| {
-            let mut chars = word.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(first) => first.to_uppercase().chain(chars).collect(),
-            }
-        })
-        .collect()
+pub mod string {
+    use rand::Rng;
+
+    pub fn to_titlecase(string: &str) -> String {
+        string
+            .split('_')
+            .map(|word| {
+                let mut chars = word.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(first) => first.to_uppercase().chain(chars).collect(),
+                }
+            })
+            .collect()
+    }
+
+    const LOWERCASE: &[char] = &[
+        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r',
+        's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+    ];
+    pub fn rand_lowercase(len: usize, buffer: &mut String) {
+        let mut rng = rand::thread_rng();
+        let pool_len = LOWERCASE.len();
+        for _ in 0..len {
+            buffer.push(LOWERCASE[rng.gen_range(0..pool_len)]);
+        }
+    }
 }
