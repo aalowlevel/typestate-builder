@@ -796,8 +796,13 @@ mod builder_build_impl {
             );
             let fields = fields
                 .into_iter()
-                .map(|field| {
-                    quote! { #field: self.#field.0 }
+                .enumerate()
+                .map(|(i, field)| match ty {
+                    StructType::Named => quote! { #field: self.#field.0 },
+                    StructType::Unnamed => {
+                        let i = syn::Index::from(i);
+                        quote! { self.#i.0 }
+                    }
                 })
                 .collect::<Vec<_>>();
             let addeds = if !addeds.is_empty() {
