@@ -563,8 +563,7 @@ pub struct BuilderStateAdded {
     pub ty: syn::Type,
     pub where_predicates: Vec<Rc<syn::WherePredicate>>,
     pub phantoms: Vec<TokenStream2>,
-    /// If Higher-Ranked Trait Bounds are used.
-    pub hrtb: Option<Vec<syn::GenericParam>>,
+    pub orphans: Vec<syn::GenericParam>,
 }
 
 impl Serialize for BuilderStateAdded {

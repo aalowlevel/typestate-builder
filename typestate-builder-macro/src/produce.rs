@@ -647,15 +647,19 @@ mod builder_impl {
 }
 
 mod builder_build_impl {
-    use std::rc::Rc;
+    use std::{collections::HashMap, rc::Rc};
 
     use indexmap::IndexMap;
     use petgraph::graph::NodeIndex;
-    use proc_macro2::TokenStream as TokenStream2;
+    use proc_macro2::{Span, TokenStream as TokenStream2};
     use quote::quote;
 
-    use crate::graph::{
-        mapkey, msg, traverse, StructElement, StructGraph, StructRelation, StructType,
+    use crate::{
+        graph::{
+            mapkey, msg, traverse, BuilderStateAdded, StructElement, StructGraph, StructRelation,
+            StructType,
+        },
+        helper,
     };
 
     pub(super) fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> TokenStream2 {
@@ -727,7 +731,6 @@ mod builder_build_impl {
             None => (None, None),
         };
 
-        /* 🐞 BUG #BG46782643 Recieve wp's from added. When Higher-ranked trait bounds are used, rename each parameter to distinguish it from the others. */
         let where_clause = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
             let addeds = traverse(
                 graph,
@@ -746,15 +749,17 @@ mod builder_build_impl {
                     }
                 },
             );
+
+            /* ✅ DEBUGGED #BG46782643 Recieve wp's from added.
+            When Higher-ranked trait bounds with orphans are used,
+            rename each parameter to distinguish it from the others. */
             let wps = addeds
                 .into_iter()
                 .flatten()
-                .flat_map(|added| {
-                    added
-                        .where_predicates
-                        .iter()
-                        .map(Rc::clone)
-                        .collect::<Vec<_>>()
+                .flat_map(|added| rename_orphans(Rc::clone(&added)))
+                .map(|f| match f {
+                    WPOwnedOrShared::Owned(where_predicate) => quote! { #where_predicate },
+                    WPOwnedOrShared::Shared(rc) => quote! { #rc },
                 })
                 .collect::<Vec<_>>();
 
@@ -839,5 +844,101 @@ mod builder_build_impl {
             }
             _ => quote! {},
         }
+    }
+
+    enum WPOwnedOrShared {
+        Owned(syn::WherePredicate),
+        Shared(Rc<syn::WherePredicate>),
+    }
+
+    fn rename_orphans(added: Rc<BuilderStateAdded>) -> Vec<WPOwnedOrShared> {
+        let mut res = Vec::with_capacity(added.where_predicates.len());
+
+        for wp in added.where_predicates.iter() {
+            let mut new_bounds_left = HashMap::new();
+            let mut new_bounds_right = HashMap::new();
+
+            /* ✅ #TD77972132 Mark orphans. */
+            if let syn::WherePredicate::Type(predicate_type) = wp.as_ref() {
+                /* ✅ #TD49524702 Bound Lifetimes. */
+                if let Some(blts) = &predicate_type.lifetimes {
+                    for (pos_blt, blt) in blts.lifetimes.iter().enumerate() {
+                        if let Some(pos_orphan) = added.orphans.iter().position(|orphan| {
+                            if let syn::GenericParam::Lifetime(blt) = blt {
+                                if let syn::GenericParam::Lifetime(orphan) = orphan {
+                                    blt.lifetime == orphan.lifetime
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        }) {
+                            let mut new_name = String::new();
+                            new_name.push('\'');
+                            helper::string::rand_lowercase(8, &mut new_name);
+                            new_bounds_left.insert(pos_blt, (pos_orphan, new_name));
+                        }
+                    }
+                }
+
+                /* ✅ #TD57071027 Bounds. */
+                for (pos_bound, bound) in predicate_type.bounds.iter().enumerate() {
+                    if let syn::TypeParamBound::Lifetime(lt0) = bound {
+                        if let Some(pos_orphan) = added.orphans.iter().position(|p| {
+                            if let syn::GenericParam::Lifetime(ltp) = p {
+                                &ltp.lifetime == lt0
+                            } else {
+                                false
+                            }
+                        }) {
+                            new_bounds_right.insert(pos_bound, pos_orphan);
+                        }
+                    }
+                }
+            }
+
+            /* ✅ #TD05287204 Replace orphan names. */
+            if !new_bounds_left.is_empty() {
+                if let syn::WherePredicate::Type(predicate_type) = wp.as_ref() {
+                    let mut new_predicate_type = predicate_type.clone();
+
+                    if let Some(blts) = &mut new_predicate_type.lifetimes {
+                        for (pos_blt, (_pos_orphan, new_name)) in new_bounds_left.iter() {
+                            let new_gp = syn::GenericParam::Lifetime(syn::LifetimeParam::new(
+                                syn::Lifetime::new(new_name, Span::call_site()),
+                            ));
+                            blts.lifetimes[*pos_blt] = new_gp;
+                        }
+                    }
+
+                    for (pos_bound, pos_orphan0) in new_bounds_right {
+                        if let Some(new_name) = new_bounds_left.iter().find_map(
+                            |(_pos_blt, (pos_orphan1, new_name))| {
+                                if &pos_orphan0 == pos_orphan1 {
+                                    Some(new_name)
+                                } else {
+                                    None
+                                }
+                            },
+                        ) {
+                            let new_tpb = syn::TypeParamBound::Lifetime(syn::Lifetime::new(
+                                new_name,
+                                Span::call_site(),
+                            ));
+                            new_predicate_type.bounds[pos_bound] = new_tpb;
+                        }
+                    }
+
+                    res.push(WPOwnedOrShared::Owned(syn::WherePredicate::Type(
+                        new_predicate_type,
+                    )));
+                }
+            } else {
+                res.push(WPOwnedOrShared::Shared(Rc::clone(wp)));
+            }
+        }
+
+        res
     }
 }

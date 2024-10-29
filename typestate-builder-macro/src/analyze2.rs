@@ -23,7 +23,7 @@ use crate::{
         mapkey, msg, traverse, traverse_mut, BuilderStateAdded, StructElement, StructGraph,
         StructRelation,
     },
-    helper::string::{rand_lowercase, to_titlecase},
+    helper,
 };
 
 pub fn run(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>) {
@@ -56,7 +56,7 @@ fn create_builder(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>
                 .map(|f| f.to_string())
                 .unwrap_or_else(|| format!("field{}", field.nth));
             let ident = syn::Ident::new(&ident_str, Span::call_site());
-            let mut ident_tc_str = to_titlecase(&ident_str);
+            let mut ident_tc_str = helper::string::to_titlecase(&ident_str);
             ident_tc_str.push_str("GenericParam");
             let ident_tc = syn::Ident::new(&ident_tc_str, Span::call_site());
             (field_node, ident, ident_tc)
@@ -131,10 +131,16 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
             } = BuilderStatePair::new(graph, field_node, map);
 
             /* ✅ #TD93602268 Idents of pair. */
-            let ident_empty =
-                format_ident!("{}{}Empty", main_ident, to_titlecase(&ident.to_string()));
-            let ident_added =
-                format_ident!("{}{}Added", main_ident, to_titlecase(&ident.to_string()));
+            let ident_empty = format_ident!(
+                "{}{}Empty",
+                main_ident,
+                helper::string::to_titlecase(&ident.to_string())
+            );
+            let ident_added = format_ident!(
+                "{}{}Added",
+                main_ident,
+                helper::string::to_titlecase(&ident.to_string())
+            );
 
             /* ✅ #TD39331204 Create field generics. */
             let len_additions = field_to_where_predicates.len() * 2;
@@ -148,8 +154,8 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
             /* ✅ #TD13775189 Phantoms init */
             let mut phantoms = Vec::with_capacity(field_to_where_predicates.len());
 
-            /* ✍️ TODO #TD11319653 Higher-Ranked Trait Bounds init. */
-            let mut hrtb = None;
+            /* ✅ #TD15379408 Orphans init. */
+            let mut orphans = Vec::new();
 
             /* ✅ #TD18715806 Determining where predicates related to the field. */
             let mut where_predicates = Vec::with_capacity(field_to_where_predicates.len());
@@ -157,7 +163,7 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
                 let mut predicate = (*field_to_where_predicate.wp).clone();
 
                 /* 🌀 COMPLEXITY #CP60692702 Orphan wp right lifetimes. Add Higher-ranked trait bounds for them (ForLifetimes). */
-                /* 🐞 BUG #BG46782643 Register Higher-ranked trait bound when it's used. */
+                /* ✅ DEBUGGED #BG46782643 Register Higher-ranked trait bound when it's used. */
                 {
                     let orphan_lts = field_to_where_predicate
                         .right_lifetimes_in_generics
@@ -175,12 +181,12 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
                         syn::WherePredicate::Type(predicate_type) => {
                             if let Some(blts) = &mut predicate_type.lifetimes {
                                 blts.lifetimes.extend(orphan_lts.clone());
-                                hrtb = Some(orphan_lts);
+                                orphans.extend(orphan_lts);
                             } else if !orphan_lts.is_empty() {
                                 let mut new_hrtb = syn::BoundLifetimes::default();
                                 new_hrtb.lifetimes.extend(orphan_lts.clone());
+                                orphans.extend(orphan_lts);
                                 predicate_type.lifetimes = Some(new_hrtb);
-                                hrtb = Some(orphan_lts);
                             }
                         }
                         _ => unimplemented!(),
@@ -239,7 +245,7 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
                     ty,
                     where_predicates,
                     phantoms,
-                    hrtb,
+                    orphans,
                 },
             )));
             graph.add_edge(
@@ -271,17 +277,6 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
             true,
             action,
         );
-    }
-}
-
-fn rename_orphan_lts(orphan_lts: &mut [syn::GenericParam]) {
-    for orphan_lt in orphan_lts.iter_mut() {
-        if let syn::GenericParam::Lifetime(lifetime_param) = orphan_lt {
-            let mut new_lt_ident = String::new();
-            new_lt_ident.push('\'');
-            rand_lowercase(8, &mut new_lt_ident);
-            lifetime_param.lifetime = syn::Lifetime::new(&new_lt_ident, Span::call_site());
-        }
     }
 }
 
