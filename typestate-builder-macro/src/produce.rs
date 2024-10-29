@@ -811,8 +811,24 @@ mod builder_build_impl {
                     .map(|added| {
                         let ident = &added.ident;
                         let generics = if !added.generics.is_empty() {
-                            let generics = &added.generics;
-                            quote! { <#(#generics),*> }
+                            let mut agts = Vec::with_capacity(added.generics.len());
+                            for generic in &added.generics {
+                                match generic.as_ref() {
+                                    syn::GenericParam::Lifetime(lifetime_param) => {
+                                        let lt = &lifetime_param.lifetime;
+                                        agts.push(quote! { #lt });
+                                    }
+                                    syn::GenericParam::Type(type_param) => {
+                                        let ident = &type_param.ident;
+                                        agts.push(quote! { #ident });
+                                    }
+                                    syn::GenericParam::Const(const_param) => {
+                                        let ident = &const_param.ident;
+                                        agts.push(quote! { #ident });
+                                    }
+                                }
+                            }
+                            quote! { <#(#agts),*> }
                         } else {
                             quote! {}
                         };
