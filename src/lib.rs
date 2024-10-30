@@ -26,7 +26,7 @@
   - [Example](#example)
 - [How It Works](#how-it-works)
 - [Code Expanded](#code-expanded)
-- [Limitations](#limitations)
+- [Possible Limitations](#possible-limitations)
 - [License](#license)
 
 ## Features
