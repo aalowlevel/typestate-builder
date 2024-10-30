@@ -650,7 +650,7 @@ mod builder_build_impl {
     use std::{collections::HashMap, rc::Rc};
 
     use indexmap::IndexMap;
-    use petgraph::graph::NodeIndex;
+    use petgraph::{graph::NodeIndex, Direction};
     use proc_macro2::{Span, TokenStream as TokenStream2};
     use quote::quote;
 
@@ -698,37 +698,61 @@ mod builder_build_impl {
                     let StructElement::Generic(generic) = &graph[node_generic] else {
                         panic!("{}", msg::node::GENERIC);
                     };
-                    Rc::clone(&generic.syn)
+                    let field_conn =
+                        graph
+                            .edges_directed(node_generic, Direction::Incoming)
+                            .any(|p| {
+                                let edge = p.weight();
+                                edge == &StructRelation::FieldGenericInMainType
+                                    || edge == &StructRelation::FieldGenericInMainLifetime
+                                    || edge == &StructRelation::FieldGenericInMainConst
+                            });
+                    (Rc::clone(&generic.syn), field_conn)
                 },
             );
+
             if !generics.is_empty() {
                 let mut first = Vec::with_capacity(generics.len());
                 let mut second = Vec::with_capacity(generics.len());
-                for generic in generics {
-                    first.push(quote! { #generic });
+                let mut gmethod = Vec::with_capacity(generics.len());
+                for (generic, field_connection) in generics {
                     match generic.as_ref() {
                         syn::GenericParam::Lifetime(lifetime_param) => {
+                            first.push(quote! { #generic });
                             let lt = &lifetime_param.lifetime;
                             second.push(quote! { #lt });
                         }
                         syn::GenericParam::Type(type_param) => {
+                            first.push(quote! { #generic });
                             let ident = &type_param.ident;
                             second.push(quote! { #ident });
                         }
+                        /* ✅ DEBUGGED #BG76154394 Const generics that no field uses it
+                        must be generics of the build method. */
                         syn::GenericParam::Const(const_param) => {
                             let ident = &const_param.ident;
+                            if !field_connection {
+                                gmethod.push(quote! { #generic });
+                            } else {
+                                first.push(quote! { #generic });
+                            }
                             second.push(quote! { #ident });
                         }
                     }
                 }
-                (quote! { <#(#first),*> }, quote! { <#(#second),*> })
+                let gmethod = if !gmethod.is_empty() {
+                    quote! { <#(#gmethod),*> }
+                } else {
+                    quote! {}
+                };
+                (quote! { <#(#first),*> }, quote! { <#(#second),*> }, gmethod)
             } else {
-                (quote! {}, quote! {})
+                (quote! {}, quote! {}, quote! {})
             }
         });
-        let (gfirst, gsecond) = match generics {
-            Some((gfirst, gsecond)) => (Some(gfirst), Some(gsecond)),
-            None => (None, None),
+        let (gfirst, gsecond, gmethod) = match generics {
+            Some((gfirst, gsecond, gmethod)) => (Some(gfirst), Some(gsecond), Some(gmethod)),
+            None => (None, None, None),
         };
 
         let where_clause = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
@@ -846,7 +870,7 @@ mod builder_build_impl {
             (StructType::Named, Some((fields, addeds))) => {
                 quote! {
                     impl #gfirst #builder_ident #addeds #where_clause {
-                        #vis fn build(self) -> #ident #gsecond {
+                        #vis fn build #gmethod (self) -> #ident #gsecond {
                             #ident {
                                 #(#fields),*
                             }
@@ -857,7 +881,7 @@ mod builder_build_impl {
             (StructType::Unnamed, Some((fields, addeds))) => {
                 quote! {
                     impl #gfirst #builder_ident #addeds #where_clause {
-                        #vis fn build(self) -> #ident #gsecond {
+                        #vis fn build #gmethod (self) -> #ident #gsecond {
                             #ident ( #(#fields),* )
                         }
                     }
