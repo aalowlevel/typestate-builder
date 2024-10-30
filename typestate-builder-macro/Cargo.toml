@@ -1,6 +1,6 @@
 [package]
 name = "typestate-builder-macro"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 authors = ["Andy Allison <rustacean15@gmail.com>"]
 description = "Derive-macro-based generator that combines `Typestate` and `Builder` patterns."

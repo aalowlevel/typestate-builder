@@ -26,7 +26,6 @@ mod parse;
 mod produce;
 
 use graph::{StructElement, StructRelation};
-use helper::write_graph_to_file;
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use quote::quote;
@@ -56,9 +55,9 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
         #(#res)*
     };
 
-    #[cfg(debug_assertions)]
-    {
-        write_graph_to_file(&graph, "example.dot").unwrap();
-    }
+    // #[cfg(debug_assertions)]
+    // {
+    //     helper::write_graph_to_file(&graph, "example.dot").unwrap();
+    // }
     output.into()
 }

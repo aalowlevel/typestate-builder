@@ -46,6 +46,7 @@ pub fn extract_ident(ty: &Type) -> Option<&Ident> {
     }
 }
 
+#[allow(dead_code)]
 pub fn write_graph_to_file<N: std::fmt::Debug, E: std::fmt::Debug>(
     graph: &Graph<N, E>,
     filename: &str,
