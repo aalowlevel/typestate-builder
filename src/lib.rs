@@ -76,19 +76,19 @@ In this example, the Person struct uses the `TypestateBuilder` derive macro to c
 The expanded version of the above code is like this:
 
 ```rust
-struct PersonBuilderNameAdded(String);
-struct PersonBuilderNameEmpty;
-struct PersonBuilderAgeAdded(u32);
-struct PersonBuilderAgeEmpty;
-struct PersonBuilderEmailAdded(Option<String>);
-struct PersonBuilderEmailEmpty;
-pub struct PersonBuilder<Name, Age, Email> {
-    name: Name,
-    age: Age,
-    email: Email,
+struct PersonBuilder<NameGenericParam, AgeGenericParam, EmailGenericParam> {
+    name: NameGenericParam,
+    age: AgeGenericParam,
+    email: EmailGenericParam,
 }
+struct PersonBuilderNameEmpty;
+struct PersonBuilderNameAdded(String);
+struct PersonBuilderAgeEmpty;
+struct PersonBuilderAgeAdded(u32);
+struct PersonBuilderEmailEmpty;
+struct PersonBuilderEmailAdded(Option<String>);
 impl Person {
-    pub fn builder() -> PersonBuilder<
+    fn builder() -> PersonBuilder<
         PersonBuilderNameEmpty,
         PersonBuilderAgeEmpty,
         PersonBuilderEmailEmpty,
@@ -100,11 +100,14 @@ impl Person {
         }
     }
 }
-impl<Age, Email> PersonBuilder<PersonBuilderNameEmpty, Age, Email> {
-    pub fn name(
+impl<
+    AgeGenericParam,
+    EmailGenericParam,
+> PersonBuilder<PersonBuilderNameEmpty, AgeGenericParam, EmailGenericParam> {
+    fn name(
         self,
         name: String,
-    ) -> PersonBuilder<PersonBuilderNameAdded, Age, Email> {
+    ) -> PersonBuilder<PersonBuilderNameAdded, AgeGenericParam, EmailGenericParam> {
         PersonBuilder {
             name: PersonBuilderNameAdded(name),
             age: self.age,
@@ -112,8 +115,14 @@ impl<Age, Email> PersonBuilder<PersonBuilderNameEmpty, Age, Email> {
         }
     }
 }
-impl<Name, Email> PersonBuilder<Name, PersonBuilderAgeEmpty, Email> {
-    pub fn age(self, age: u32) -> PersonBuilder<Name, PersonBuilderAgeAdded, Email> {
+impl<
+    NameGenericParam,
+    EmailGenericParam,
+> PersonBuilder<NameGenericParam, PersonBuilderAgeEmpty, EmailGenericParam> {
+    fn age(
+        self,
+        age: u32,
+    ) -> PersonBuilder<NameGenericParam, PersonBuilderAgeAdded, EmailGenericParam> {
         PersonBuilder {
             name: self.name,
             age: PersonBuilderAgeAdded(age),
@@ -121,11 +130,14 @@ impl<Name, Email> PersonBuilder<Name, PersonBuilderAgeEmpty, Email> {
         }
     }
 }
-impl<Name, Age> PersonBuilder<Name, Age, PersonBuilderEmailEmpty> {
-    pub fn email(
+impl<
+    NameGenericParam,
+    AgeGenericParam,
+> PersonBuilder<NameGenericParam, AgeGenericParam, PersonBuilderEmailEmpty> {
+    fn email(
         self,
         email: Option<String>,
-    ) -> PersonBuilder<Name, Age, PersonBuilderEmailAdded> {
+    ) -> PersonBuilder<NameGenericParam, AgeGenericParam, PersonBuilderEmailAdded> {
         PersonBuilder {
             name: self.name,
             age: self.age,
@@ -138,7 +150,7 @@ impl PersonBuilder<
     PersonBuilderAgeAdded,
     PersonBuilderEmailAdded,
 > {
-    pub fn build(self) -> Person {
+    fn build(self) -> Person {
         Person {
             name: self.name.0,
             age: self.age.0,
