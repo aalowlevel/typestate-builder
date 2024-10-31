@@ -4,16 +4,6 @@ use typestate_builder::TypestateBuilder;
 
 fn main() {}
 
-// #[derive(TypestateBuilder)]
-// struct NestedGenerics<'a, T, U>
-// where
-//     T: 'a + Copy + Clone,
-//     U: 'a + AsRef<T> + Clone,
-// {
-//     value: &'a T,
-//     ref_container: U,
-// }
-
 #[derive(TypestateBuilder)]
 #[typestate_builder(builder_type = "aaa", builder_method = "bbb")]
 struct ComplexTuple<'a, T, U, V>(

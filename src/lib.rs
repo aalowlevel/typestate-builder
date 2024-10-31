@@ -24,7 +24,7 @@
 - [Example](#example)
 - [How It Works](#how-it-works)
 - [Code Expanded](#code-expanded)
-- [Configuration Options](#configuration-options)
+- [Main Configuration Options](#main-configuration-options)
 - [Field Configuration Options](#field-configuration-options)
 - [Possible Limitations](#possible-limitations)
 - [License](#license)
@@ -36,6 +36,7 @@
 - Compile-Time Safety: All required fields must be initialized before creating an instance of the struct, promoting safer code.
 - Support for Named and Tuple Structs: Works seamlessly with both named and tuple structs, with clear error messages for unsupported configurations.
 - Fluent and Intuitive Syntax: Offers a simple and idiomatic Rust syntax for creating builders, enhancing code readability and usability.
+- Isolation: The `typestate_builder`` crate provides configurations wrapped around `typestate_builder` attribute isolation, ensuring that different crates cannot interfere with each other.
 
 # Example
 
@@ -160,9 +161,9 @@ impl PersonBuilder<
 }
 ```
 
-# Configuration Options
+# Main Configuration Options
 
-The macro supports configuration through attributes:
+Configurations wrapped around `typestate_builder` attribute isolation, ensuring that different crates cannot interfere with each other. The macro supports configuration through main attributes:
 
 ```rust
 #[derive(TypestateBuilder)]
