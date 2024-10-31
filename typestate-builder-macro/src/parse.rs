@@ -48,7 +48,7 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
     let mut map = IndexMap::new();
 
     /* ✅ #TD80531813 Set options */
-    let parse_main_options = ParseMainOptions::new(input.attrs);
+    let parse_main_options = MainOptions::new(input.attrs);
 
     /* ✅ #TD24693499 Describe builder type ident. */
     {
@@ -150,6 +150,7 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
 }
 
 fn map_syn_field((nth, syn): (usize, syn::Field)) -> Field {
+    proc_macro_error::emit_call_site_warning!(format!("{:#?}", syn.attrs));
     Field {
         nth,
         syn,
@@ -161,7 +162,7 @@ fn map_syn_field((nth, syn): (usize, syn::Field)) -> Field {
 }
 
 #[derive(Default)]
-struct ParseMainOptions {
+struct MainOptions {
     builder_type: Option<String>,
     builder_method: Option<String>,
 }
@@ -179,9 +180,9 @@ impl syn::parse::Parse for AttributeArgs {
     }
 }
 
-impl ParseMainOptions {
+impl MainOptions {
     fn new(attrs: Vec<syn::Attribute>) -> Self {
-        let mut parse_main_args = ParseMainOptions::default();
+        let mut main_options = MainOptions::default();
 
         // Capture `typestate_builder` attributes specified in the struct
         for attr in attrs {
@@ -195,32 +196,32 @@ impl ParseMainOptions {
             if let Ok(attrs) = syn::parse2::<AttributeArgs>(meta_list.tokens) {
                 for meta in attrs.attrs {
                     if meta.path().is_ident("builder_type") {
-                        let lit_str = Self::value_litstr_validation(meta);
+                        let lit_str = value_litstr_validation(meta);
                         let titlecase = helper::string::to_titlecase(&lit_str.value());
-                        parse_main_args.builder_type = Some(titlecase);
+                        main_options.builder_type = Some(titlecase);
                     } else if meta.path().is_ident("builder_method") {
-                        let lit_str = Self::value_litstr_validation(meta);
-                        parse_main_args.builder_method = Some(lit_str.value().to_lowercase());
+                        let lit_str = value_litstr_validation(meta);
+                        main_options.builder_method = Some(lit_str.value().to_lowercase());
                     }
                 }
             }
         }
 
-        parse_main_args
+        main_options
     }
+}
 
-    fn value_litstr_validation(meta: syn::Meta) -> syn::LitStr {
-        let syn::Meta::NameValue(syn::MetaNameValue {
-            value:
-                syn::Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Str(lit_str),
-                    ..
-                }),
-            ..
-        }) = meta
-        else {
-            panic!("This attribute must be key = \"value\" syntax.");
-        };
-        lit_str
-    }
+fn value_litstr_validation(meta: syn::Meta) -> syn::LitStr {
+    let syn::Meta::NameValue(syn::MetaNameValue {
+        value:
+            syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Str(lit_str),
+                ..
+            }),
+        ..
+    }) = meta
+    else {
+        panic!("This attribute must be key = \"value\" syntax.");
+    };
+    lit_str
 }

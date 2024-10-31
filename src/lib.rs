@@ -26,7 +26,7 @@
 - [Code Expanded](#code-expanded)
 - [Main Configuration Options](#main-configuration-options)
 - [Field Configuration Options](#field-configuration-options)
-- [Possible Limitations](#possible-limitations)
+- [Reliability](#reliability)
 - [License](#license)
 
 # Features
@@ -185,9 +185,9 @@ struct Person {
 
 
 
-# Possible Limitations
+# Reliability
 
-In fact, I’m not entirely sure what the upper limit is for the most complex struct that this crate can handle. However, I’ve added [dozens of complex structs here](https://github.com/aalowlevel/typestate-builder/blob/master/src/lib.rs) for testing purposes, and the crate successfully handles all of them. If you have any new ideas for testing structs, feel free to send me a PR.
+I’ve added [dozens of complex structs here](https://github.com/aalowlevel/typestate-builder/blob/master/src/lib.rs) for testing purposes, and the crate successfully handles all of them. If you have any new ideas about deity level Rust structs for testing, feel free to send me a PR.
 
 # License
 
