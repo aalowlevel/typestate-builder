@@ -5,6 +5,7 @@ mod inner {
 
     #[derive(Debug, TypestateBuilder)] // `Debug` is not a must.
     pub(super) struct Person {
+        #[typestate_builder(default)]
         name: String,
         age: u32,
         email: Option<String>,

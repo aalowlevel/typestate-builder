@@ -48,7 +48,7 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
     let mut map = IndexMap::new();
 
     /* ✅ #TD80531813 Set options */
-    let parse_main_options = MainOptions::new(input.attrs);
+    let parse_main_options = MainOptions::new(&input.attrs);
 
     /* ✅ #TD24693499 Describe builder type ident. */
     {
@@ -150,21 +150,15 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
 }
 
 fn map_syn_field((nth, syn): (usize, syn::Field)) -> Field {
-    proc_macro_error::emit_call_site_warning!(format!("{:#?}", syn.attrs));
+    let field_options = FieldOptions::new(&syn.attrs);
     Field {
         nth,
         syn,
         types: IndexSet::new(),
         lifetimes: IndexSet::new(),
         const_params: IndexSet::new(),
-        default: false,
+        default: field_options.default,
     }
-}
-
-#[derive(Default)]
-struct MainOptions {
-    builder_type: Option<String>,
-    builder_method: Option<String>,
 }
 
 /// Parser for the entire attribute content
@@ -177,37 +171,6 @@ impl syn::parse::Parse for AttributeArgs {
         Ok(Self {
             attrs: syn::punctuated::Punctuated::parse_terminated(input)?,
         })
-    }
-}
-
-impl MainOptions {
-    fn new(attrs: Vec<syn::Attribute>) -> Self {
-        let mut main_options = MainOptions::default();
-
-        // Capture `typestate_builder` attributes specified in the struct
-        for attr in attrs {
-            if !attr.path().is_ident("typestate_builder") {
-                continue;
-            }
-            let syn::Meta::List(meta_list) = attr.meta else {
-                panic!("typestate_builder attribute must be a list.")
-            };
-
-            if let Ok(attrs) = syn::parse2::<AttributeArgs>(meta_list.tokens) {
-                for meta in attrs.attrs {
-                    if meta.path().is_ident("builder_type") {
-                        let lit_str = value_litstr_validation(meta);
-                        let titlecase = helper::string::to_titlecase(&lit_str.value());
-                        main_options.builder_type = Some(titlecase);
-                    } else if meta.path().is_ident("builder_method") {
-                        let lit_str = value_litstr_validation(meta);
-                        main_options.builder_method = Some(lit_str.value().to_lowercase());
-                    }
-                }
-            }
-        }
-
-        main_options
     }
 }
 
@@ -224,4 +187,67 @@ fn value_litstr_validation(meta: syn::Meta) -> syn::LitStr {
         panic!("This attribute must be key = \"value\" syntax.");
     };
     lit_str
+}
+
+fn new_options<O, F>(attrs: &[syn::Attribute], action: F) -> O
+where
+    O: Default,
+    F: Fn(syn::Meta, &mut O),
+{
+    let mut options = O::default();
+
+    // Capture `typestate_builder` attributes specified in the struct
+    for attr in attrs {
+        if !attr.path().is_ident("typestate_builder") {
+            continue;
+        }
+        let syn::Meta::List(meta_list) = &attr.meta else {
+            panic!("typestate_builder attribute must be a list.")
+        };
+
+        /* 🏎️ PERFORMANCE #PF52011389 Cloning TokenStream is necessary at this point. */
+        if let Ok(attrs) = syn::parse2::<AttributeArgs>(meta_list.tokens.clone()) {
+            for meta in attrs.attrs {
+                action(meta, &mut options);
+            }
+        }
+    }
+
+    options
+}
+
+#[derive(Default)]
+struct MainOptions {
+    builder_type: Option<String>,
+    builder_method: Option<String>,
+}
+
+impl MainOptions {
+    fn new(attrs: &[syn::Attribute]) -> Self {
+        new_options(attrs, |meta, options: &mut Self| {
+            if meta.path().is_ident("builder_type") {
+                let lit_str = value_litstr_validation(meta);
+                let titlecase = helper::string::to_titlecase(&lit_str.value());
+                options.builder_type = Some(titlecase);
+            } else if meta.path().is_ident("builder_method") {
+                let lit_str = value_litstr_validation(meta);
+                options.builder_method = Some(lit_str.value().to_lowercase());
+            }
+        })
+    }
+}
+
+#[derive(Default)]
+struct FieldOptions {
+    default: bool,
+}
+
+impl FieldOptions {
+    fn new(attrs: &[syn::Attribute]) -> Self {
+        new_options(attrs, |meta, options: &mut Self| {
+            if meta.path().is_ident("default") {
+                options.default = true;
+            }
+        })
+    }
 }

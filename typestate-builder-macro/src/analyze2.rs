@@ -50,12 +50,12 @@ fn create_builder(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>
             let ident_tc = syn::Ident::new(&ident_tc_str, Span::call_site());
             (field_node, ident, ident_tc)
         };
-        let builder_data = traverse(graph, &[&StructRelation::FieldTrain], *ix, true, action);
+        let builder = traverse(graph, &[&StructRelation::FieldTrain], *ix, true, action);
 
         /* ✅ #TD52440080 Create builder fields, generics and their relations. */
         let mut predecessor_ident = None;
         let mut predecessor_ident_tc = None;
-        for (i, (field_node, ident, ident_tc)) in builder_data.into_iter().enumerate() {
+        for (i, (field_node, ident, ident_tc)) in builder.into_iter().enumerate() {
             /* ✅ #TD72341053 Field */
             let successor_field = graph.add_node(StructElement::BuilderField(Rc::new(ident)));
             if let Some(predecessor) = predecessor_ident.take() {
