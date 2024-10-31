@@ -132,16 +132,12 @@ mod builder {
 }
 
 mod builder_states {
-    use std::rc::Rc;
-
     use indexmap::IndexMap;
     use petgraph::graph::NodeIndex;
     use proc_macro2::TokenStream as TokenStream2;
     use quote::quote;
 
-    use crate::graph::{
-        mapkey, msg, traverse, BuilderStateAdded, StructElement, StructGraph, StructRelation,
-    };
+    use crate::graph::{mapkey, msg, traverse, StructElement, StructGraph, StructRelation};
 
     pub(super) fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> TokenStream2 {
         let Some(ix) = map.get(mapkey::uniq::VIS) else {
@@ -151,23 +147,9 @@ mod builder_states {
             panic!("{}", msg::node::VIS);
         };
 
-        if let Some(start) = map.get(mapkey::startp::BUILDER_FIELD) {
-            /* ♻️ REFACTOR #RF52666407 Remove enum. Match directly. */
-            enum PairType {
-                Empty(Rc<syn::Ident>),
-                Added(Rc<BuilderStateAdded>),
-                None,
-            }
-            let action = |graph: &StructGraph, _edge, builder_node| match &graph[builder_node] {
-                StructElement::BuilderStateEmpty(ident) => PairType::Empty(Rc::clone(ident)),
-                StructElement::BuilderStateAdded(builder_state_added) => {
-                    PairType::Added(Rc::clone(builder_state_added))
-                }
-                _ => PairType::None,
-            };
-
+        if let Some(pairs) = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
             /* ⚠️ WARNING #WR23330504 Order-sensitive graph traversal function call. */
-            let pairs = traverse(
+            traverse(
                 graph,
                 &[
                     &StructRelation::BuilderStatePair,
@@ -176,14 +158,9 @@ mod builder_states {
                 ],
                 *start,
                 false,
-                action,
-            );
-
-            let pairs = pairs
-                .into_iter()
-                .map(|pair| match pair {
-                    PairType::Empty(ident) => quote! { #vis struct #ident; },
-                    PairType::Added(bsa) => {
+                |graph, _edge, builder_node| match &graph[builder_node] {
+                    StructElement::BuilderStateEmpty(ident) => quote! { #vis struct #ident; },
+                    StructElement::BuilderStateAdded(bsa) => {
                         let ident = &bsa.ident;
                         let generics = if !bsa.generics.is_empty() {
                             let generics = &bsa.generics;
@@ -209,9 +186,10 @@ mod builder_states {
                             #vis struct #ident #generics(#ty #phantoms) #where_clause;
                         }
                     }
-                    PairType::None => quote! {},
-                })
-                .collect::<Vec<_>>();
+                    _ => quote! {},
+                },
+            )
+        }) {
             quote! { #(#pairs)* }
         } else {
             quote! {}
