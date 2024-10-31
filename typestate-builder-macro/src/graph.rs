@@ -194,6 +194,7 @@ pub struct Field {
     pub types: IndexSet<syn::Ident>,
     pub lifetimes: IndexSet<syn::Lifetime>,
     pub const_params: IndexSet<syn::Ident>,
+    pub default: bool,
 }
 
 impl Serialize for Field {

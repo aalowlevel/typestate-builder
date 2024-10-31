@@ -121,18 +121,11 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
         Fields::Named(fields_named) => {
             let ix = graph.add_node(StructElement::Type(StructType::Named));
             map.insert(mapkey::uniq::TYPE.to_string(), ix);
-
             let fields = fields_named
                 .named
                 .into_iter()
                 .enumerate()
-                .map(|(nth, syn)| Field {
-                    nth,
-                    syn,
-                    types: IndexSet::new(),
-                    lifetimes: IndexSet::new(),
-                    const_params: IndexSet::new(),
-                })
+                .map(map_syn_field)
                 .collect::<Vec<_>>();
             add_from_list!(graph, map, fields, Field, FieldTrain);
         }
@@ -144,13 +137,7 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
                 .unnamed
                 .into_iter()
                 .enumerate()
-                .map(|(nth, syn)| Field {
-                    nth,
-                    syn,
-                    types: IndexSet::new(),
-                    lifetimes: IndexSet::new(),
-                    const_params: IndexSet::new(),
-                })
+                .map(map_syn_field)
                 .collect::<Vec<_>>();
             add_from_list!(graph, map, fields, Field, FieldTrain);
         }
@@ -162,6 +149,17 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
     (graph, map)
 }
 
+fn map_syn_field((nth, syn): (usize, syn::Field)) -> Field {
+    Field {
+        nth,
+        syn,
+        types: IndexSet::new(),
+        lifetimes: IndexSet::new(),
+        const_params: IndexSet::new(),
+        default: false,
+    }
+}
+
 #[derive(Default)]
 struct ParseMainOptions {
     builder_type: Option<String>,
@@ -170,13 +168,13 @@ struct ParseMainOptions {
 
 /// Parser for the entire attribute content
 struct AttributeArgs {
-    pairs: syn::punctuated::Punctuated<syn::MetaNameValue, syn::Token![,]>,
+    attrs: syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>,
 }
 
 impl syn::parse::Parse for AttributeArgs {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            pairs: syn::punctuated::Punctuated::parse_terminated(input)?,
+            attrs: syn::punctuated::Punctuated::parse_terminated(input)?,
         })
     }
 }
@@ -195,13 +193,13 @@ impl ParseMainOptions {
             };
 
             if let Ok(attrs) = syn::parse2::<AttributeArgs>(meta_list.tokens) {
-                for pair in attrs.pairs {
-                    if pair.path.is_ident("builder_type") {
-                        let lit_str = Self::value_litstr_validation(pair);
+                for meta in attrs.attrs {
+                    if meta.path().is_ident("builder_type") {
+                        let lit_str = Self::value_litstr_validation(meta);
                         let titlecase = helper::string::to_titlecase(&lit_str.value());
                         parse_main_args.builder_type = Some(titlecase);
-                    } else if pair.path.is_ident("builder_method") {
-                        let lit_str = Self::value_litstr_validation(pair);
+                    } else if meta.path().is_ident("builder_method") {
+                        let lit_str = Self::value_litstr_validation(meta);
                         parse_main_args.builder_method = Some(lit_str.value().to_lowercase());
                     }
                 }
@@ -211,11 +209,15 @@ impl ParseMainOptions {
         parse_main_args
     }
 
-    fn value_litstr_validation(pair: syn::MetaNameValue) -> syn::LitStr {
-        let syn::Expr::Lit(syn::ExprLit {
-            lit: syn::Lit::Str(lit_str),
+    fn value_litstr_validation(meta: syn::Meta) -> syn::LitStr {
+        let syn::Meta::NameValue(syn::MetaNameValue {
+            value:
+                syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(lit_str),
+                    ..
+                }),
             ..
-        }) = pair.value
+        }) = meta
         else {
             panic!("This attribute must be key = \"value\" syntax.");
         };
