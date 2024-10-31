@@ -73,10 +73,10 @@ mod builder {
             /* ⚠️ WARNING #WR04864549 Order-sensitive graph traversal function call. */
             let idents = traverse(
                 graph,
-                Some(&[
+                &[
                     &StructRelation::BuilderFieldToBuilderGeneric,
                     &StructRelation::BuilderFieldTrain,
-                ]),
+                ],
                 *start,
                 true,
                 action,
@@ -169,11 +169,11 @@ mod builder_states {
             /* ⚠️ WARNING #WR23330504 Order-sensitive graph traversal function call. */
             let pairs = traverse(
                 graph,
-                Some(&[
+                &[
                     &StructRelation::BuilderStatePair,
                     &StructRelation::BuilderFieldToBuilderState,
                     &StructRelation::BuilderFieldTrain,
-                ]),
+                ],
                 *start,
                 false,
                 action,
@@ -260,7 +260,7 @@ mod builder_new_impl {
         let generics = map.get(mapkey::startp::GENERICS).map(|start| {
             let generics = traverse(
                 graph,
-                Some(&[&StructRelation::GenericTrain]),
+                &[&StructRelation::GenericTrain],
                 *start,
                 true,
                 |graph, _edge, node_generic| {
@@ -308,7 +308,7 @@ mod builder_new_impl {
         let where_clause = map.get(mapkey::startp::WP).map(|start| {
             let wps = traverse(
                 graph,
-                Some(&[&StructRelation::WherePredicateTrain]),
+                &[&StructRelation::WherePredicateTrain],
                 *start,
                 true,
                 |graph, _edge, node_wp| {
@@ -328,10 +328,10 @@ mod builder_new_impl {
         let collections = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
             let collected = traverse(
                 graph,
-                Some(&[
+                &[
                     &StructRelation::BuilderFieldToBuilderState,
                     &StructRelation::BuilderFieldTrain,
-                ]),
+                ],
                 *start,
                 true,
                 |graph, _edge, node| match &graph[node] {
@@ -465,12 +465,12 @@ mod builder_impl {
             };
             traverse(
                 graph,
-                Some(&[
+                &[
                     &StructRelation::BuilderStatePair,
                     &StructRelation::BuilderFieldToBuilderState,
                     &StructRelation::BuilderFieldToBuilderGeneric,
                     &StructRelation::BuilderFieldTrain,
-                ]),
+                ],
                 *start,
                 true,
                 action,
@@ -691,7 +691,7 @@ mod builder_build_impl {
         let generics = map.get(mapkey::startp::GENERICS).map(|start| {
             let generics = traverse(
                 graph,
-                Some(&[&StructRelation::GenericTrain]),
+                &[&StructRelation::GenericTrain],
                 *start,
                 true,
                 |graph, _edge, node_generic| {
@@ -758,11 +758,11 @@ mod builder_build_impl {
         let where_clause = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
             let addeds = traverse(
                 graph,
-                Some(&[
+                &[
                     &StructRelation::BuilderStatePair,
                     &StructRelation::BuilderFieldToBuilderState,
                     &StructRelation::BuilderFieldTrain,
-                ]),
+                ],
                 *start,
                 true,
                 |graph, _edge, node| {
@@ -809,11 +809,11 @@ mod builder_build_impl {
                 };
             traverse(
                 graph,
-                Some(&[
+                &[
                     &StructRelation::BuilderStatePair,
                     &StructRelation::BuilderFieldToBuilderState,
                     &StructRelation::BuilderFieldTrain,
-                ]),
+                ],
                 *start,
                 true,
                 action,

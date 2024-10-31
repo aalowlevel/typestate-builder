@@ -50,13 +50,7 @@ fn create_builder(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>
             let ident_tc = syn::Ident::new(&ident_tc_str, Span::call_site());
             (field_node, ident, ident_tc)
         };
-        let builder_data = traverse(
-            graph,
-            Some(&[&StructRelation::FieldTrain]),
-            *ix,
-            true,
-            action,
-        );
+        let builder_data = traverse(graph, &[&StructRelation::FieldTrain], *ix, true, action);
 
         /* ✅ #TD52440080 Create builder fields, generics and their relations. */
         let mut predecessor_ident = None;
@@ -253,19 +247,13 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
             };
             traverse_mut(
                 graph,
-                Some(&[&StructRelation::FieldToBuilderField]),
+                &[&StructRelation::FieldToBuilderField],
                 field_node,
                 false,
                 action,
             );
         };
-        traverse_mut(
-            graph,
-            Some(&[&StructRelation::FieldTrain]),
-            *start,
-            true,
-            action,
-        );
+        traverse_mut(graph, &[&StructRelation::FieldTrain], *start, true, action);
     }
 }
 
@@ -324,28 +312,28 @@ impl<'a> BuilderStatePair<'a> {
         };
         let field_to_main_lifetimes = traverse(
             graph,
-            Some(&[&StructRelation::FieldGenericInMainLifetime]),
+            &[&StructRelation::FieldGenericInMainLifetime],
             field_node,
             false,
             Self::traverse_field_to_main_generics,
         );
         let field_to_main_consts = traverse(
             graph,
-            Some(&[&StructRelation::FieldGenericInMainConst]),
+            &[&StructRelation::FieldGenericInMainConst],
             field_node,
             false,
             Self::traverse_field_to_main_generics,
         );
         let field_to_main_types = traverse(
             graph,
-            Some(&[&StructRelation::FieldGenericInMainType]),
+            &[&StructRelation::FieldGenericInMainType],
             field_node,
             false,
             Self::traverse_field_to_main_generics,
         );
         let field_to_where_predicates = traverse(
             graph,
-            Some(&[&StructRelation::FieldGenericInWhereClause]),
+            &[&StructRelation::FieldGenericInWhereClause],
             field_node,
             false,
             Self::traverse_field_to_where_predicate,
@@ -382,21 +370,21 @@ impl<'a> BuilderStatePair<'a> {
         };
         let right_lifetimes_in_generics = traverse(
             graph,
-            Some(&[&StructRelation::WPRightBoundingLifetimeInMain]),
+            &[&StructRelation::WPRightBoundingLifetimeInMain],
             wp_node,
             false,
             Self::traverse_wp_to_main_generics,
         );
         let right_types_in_generics = traverse(
             graph,
-            Some(&[&StructRelation::WPRightBoundingTypeInMain]),
+            &[&StructRelation::WPRightBoundingTypeInMain],
             wp_node,
             false,
             Self::traverse_wp_to_main_generics,
         );
         let right_types_phantoms_in_generics = traverse(
             graph,
-            Some(&[&StructRelation::WPRightBoundingTypePhantomInMain]),
+            &[&StructRelation::WPRightBoundingTypePhantomInMain],
             wp_node,
             false,
             Self::traverse_wp_to_main_generics,

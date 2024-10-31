@@ -32,13 +32,7 @@ fn bind_field_elements(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex
             traversal_field_to_generics(graph, node_field, map);
             traversal_field_to_where_clause(graph, node_field, map);
         };
-        traverse_mut(
-            graph,
-            Some(&[&StructRelation::FieldTrain]),
-            *start,
-            true,
-            action,
-        );
+        traverse_mut(graph, &[&StructRelation::FieldTrain], *start, true, action);
     }
 }
 
@@ -50,7 +44,7 @@ fn bind_where_predicate_elements(graph: &mut StructGraph, map: &IndexMap<String,
         };
         traverse_mut(
             graph,
-            Some(&[&StructRelation::WherePredicateTrain]),
+            &[&StructRelation::WherePredicateTrain],
             *start,
             true,
             action,
@@ -94,7 +88,7 @@ fn traversal_field_to_generics(
         };
         traverse_mut(
             graph,
-            Some(&[&StructRelation::GenericTrain]),
+            &[&StructRelation::GenericTrain],
             *start,
             true,
             action,
@@ -166,7 +160,7 @@ fn traversal_field_to_where_clause(
 
         traverse_mut(
             graph,
-            Some(&[&StructRelation::WherePredicateTrain]),
+            &[&StructRelation::WherePredicateTrain],
             *start,
             true,
             action,
@@ -218,7 +212,7 @@ fn traversal_wp_to_generics(
 
         traverse_mut(
             graph,
-            Some(&[&StructRelation::GenericTrain]),
+            &[&StructRelation::GenericTrain],
             *start,
             true,
             action,

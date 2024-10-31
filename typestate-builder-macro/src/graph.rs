@@ -580,10 +580,10 @@ impl Serialize for BuilderStateAdded {
         res.end()
     }
 }
-/* ♻️ REFACTOR #RF68720005 Remove option from filter_edge. */
+
 pub fn traverse<'a, N, E, F, R>(
     graph: &'a Graph<N, E>,
-    filter_edge: Option<&'a [&'a E]>,
+    filter_edge: &'a [&'a E],
     start_node: NodeIndex,
     include_start: bool,
     mut node_action: F,
@@ -610,26 +610,19 @@ where
             let mut neighbors: Vec<_> = graph
                 .neighbors(node)
                 .filter_map(|neighbor| graph.find_edge(node, neighbor).map(|edge| (edge, neighbor)))
+                .filter(|&(edge, _)| filter_edge.contains(&&graph[edge]))
                 .collect();
 
             // Sort neighbors based on filter_edge order
-            if let Some(filter_edge) = filter_edge {
-                neighbors.sort_by_key(|&(edge, _)| {
-                    filter_edge
-                        .iter()
-                        .position(|&p| p == &graph[edge])
-                        .unwrap_or(usize::MAX)
-                });
-                neighbors.reverse(); // Reverse to maintain priority order when pushing to stack
-            }
+            neighbors.sort_by_key(|&(edge, _)| {
+                filter_edge
+                    .iter()
+                    .position(|&p| p == &graph[edge])
+                    .unwrap_or(usize::MAX)
+            });
+            neighbors.reverse(); // Reverse to maintain priority order when pushing to stack
 
             for (edge, neighbor) in neighbors {
-                if let Some(filter_edge) = filter_edge {
-                    if !filter_edge.contains(&&graph[edge]) {
-                        continue;
-                    }
-                }
-
                 if !visited.contains(&neighbor) {
                     stack.push((neighbor, Some(edge)));
                 }
@@ -638,9 +631,10 @@ where
     }
     results
 }
+
 pub fn traverse_mut<'a, N, E, F, R>(
     graph: &'a mut Graph<N, E>,
-    filter_edge: Option<&'a [&'a E]>,
+    filter_edge: &'a [&'a E],
     start_node: NodeIndex,
     include_start: bool,
     mut node_action: F,
@@ -667,26 +661,19 @@ where
             let mut neighbors: Vec<_> = graph
                 .neighbors(node)
                 .filter_map(|neighbor| graph.find_edge(node, neighbor).map(|edge| (edge, neighbor)))
+                .filter(|&(edge, _)| filter_edge.contains(&&graph[edge]))
                 .collect();
 
             // Sort neighbors based on filter_edge order
-            if let Some(filter_edge) = filter_edge {
-                neighbors.sort_by_key(|&(edge, _)| {
-                    filter_edge
-                        .iter()
-                        .position(|&p| p == &graph[edge])
-                        .unwrap_or(usize::MAX)
-                });
-                neighbors.reverse(); // Reverse to maintain priority order when pushing to stack
-            }
+            neighbors.sort_by_key(|&(edge, _)| {
+                filter_edge
+                    .iter()
+                    .position(|&p| p == &graph[edge])
+                    .unwrap_or(usize::MAX)
+            });
+            neighbors.reverse(); // Reverse to maintain priority order when pushing to stack
 
             for (edge, neighbor) in neighbors {
-                if let Some(filter_edge) = filter_edge {
-                    if !filter_edge.contains(&&graph[edge]) {
-                        continue;
-                    }
-                }
-
                 if !visited.contains(&neighbor) {
                     stack.push((neighbor, Some(edge)));
                 }
