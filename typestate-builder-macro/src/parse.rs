@@ -15,11 +15,12 @@ use std::rc::Rc;
 
 use crate::{
     graph::{mapkey, Field, GenericParam, StructGraph, StructType, WherePredicate},
-    StructElement, StructRelation,
+    helper, StructElement, StructRelation,
 };
 
 use indexmap::{IndexMap, IndexSet};
 use petgraph::{graph::NodeIndex, Graph};
+use quote::format_ident;
 use syn::{Data, DeriveInput, Fields};
 
 macro_rules! add_from_list {
@@ -45,6 +46,16 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
 
     let mut graph = Graph::<StructElement, StructRelation>::new();
     let mut map = IndexMap::new();
+
+    /* ✅ #TD80531813 Set options */
+    let parse_main_options = parse_main_options(&input.attrs);
+    let ident = if let Some(custom_builder_name) = &parse_main_options.custom_builder_name {
+        format_ident!("{}", custom_builder_name)
+    } else {
+        format_ident!("{}Builder", input.ident)
+    };
+    let ix = graph.add_node(StructElement::BuilderIdent(Rc::new(ident)));
+    map.insert(mapkey::uniq::BUILDER_IDENT.to_string(), ix);
 
     // Beginning
     {
@@ -135,4 +146,41 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
     }
 
     (graph, map)
+}
+
+struct ParseMainOptions {
+    custom_builder_name: Option<String>,
+}
+
+fn parse_main_options(attrs: &[syn::Attribute]) -> ParseMainOptions {
+    let mut parse_main_args = ParseMainOptions {
+        custom_builder_name: None,
+    };
+
+    // Capture `ts_builder` attributes specified in the struct
+    for attr in attrs.iter() {
+        if !attr.path().is_ident("ts_builder") {
+            continue;
+        }
+
+        if let Err(e) = attr.parse_nested_meta(|parse_nested_meta| {
+            if parse_nested_meta.path.is_ident("custom_builder_name") {
+                let Ok(value) = parse_nested_meta.value() else {
+                    panic!("This attribute must be key = \"value\" syntax.");
+                };
+                let Ok(lit_str) = value.parse::<syn::LitStr>() else {
+                    panic!("Inparsable attribute.");
+                };
+                let titlecase = helper::string::to_titlecase(&lit_str.value());
+                parse_main_args.custom_builder_name = Some(titlecase);
+                return Ok(());
+            }
+
+            panic!("Invalid attributes. Available names:\n- custom_builder_name")
+        }) {
+            panic!("{}", e);
+        }
+    }
+
+    parse_main_args
 }

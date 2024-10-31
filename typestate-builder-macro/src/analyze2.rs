@@ -32,17 +32,6 @@ pub fn run(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>) {
 }
 
 fn create_builder(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>) {
-    /* ✅ #TD10362896 Create builder. */
-    let Some(ix) = map.get(mapkey::uniq::IDENT) else {
-        panic!("{}", msg::ix::IDENT);
-    };
-    let StructElement::Ident(ident) = &graph[*ix] else {
-        panic!("{}", msg::node::IDENT);
-    };
-    let ident = format_ident!("{}Builder", ident);
-    let ix_builder = graph.add_node(StructElement::BuilderIdent(Rc::new(ident)));
-    map.insert(mapkey::uniq::BUILDER_IDENT.to_string(), ix_builder);
-
     if let Some(ix) = map.get(mapkey::startp::FIELD) {
         /* ✅ #TD92175615 Traverse on field train. */
         let action = |graph: &StructGraph, _edge, field_node| {
@@ -121,7 +110,7 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
         let action = |graph: &mut StructGraph, _edge, field_node| {
             /* ✅ #TD78515467 All data to create two-legged state structs. */
             let BuilderStatePair {
-                main_ident,
+                builder_ident,
                 ident,
                 ty,
                 field_to_main_lifetimes,
@@ -133,12 +122,12 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
             /* ✅ #TD93602268 Idents of pair. */
             let ident_empty = format_ident!(
                 "{}{}Empty",
-                main_ident,
+                builder_ident.as_ref(),
                 helper::string::to_titlecase(&ident.to_string())
             );
             let ident_added = format_ident!(
                 "{}{}Added",
-                main_ident,
+                builder_ident.as_ref(),
                 helper::string::to_titlecase(&ident.to_string())
             );
 
@@ -301,7 +290,7 @@ struct FieldToWherePredicate {
 }
 
 struct BuilderStatePair<'a> {
-    main_ident: syn::Ident,
+    builder_ident: Rc<syn::Ident>,
     ident: Cow<'a, syn::Ident>,
     ty: &'a syn::Type,
     field_to_main_lifetimes: Vec<Rc<syn::GenericParam>>,
@@ -319,10 +308,12 @@ impl<'a> BuilderStatePair<'a> {
         let StructElement::Field(field) = &graph[field_node] else {
             panic!("{}", msg::node::FIELD);
         };
-        let Some(StructElement::Ident(main_ident)) = map.get("Ident").map(|f| &graph[*f]) else {
-            panic!("Struct must have an ident.");
+        let Some(StructElement::BuilderIdent(builder_ident)) =
+            map.get(mapkey::uniq::BUILDER_IDENT).map(|f| &graph[*f])
+        else {
+            panic!("{}", msg::node::BUILDER_IDENT);
         };
-        let main_ident = format_ident!("{}Builder", main_ident);
+
         let ident = if let Some(ident) = &field.syn.ident {
             Cow::Borrowed(ident)
         } else {
@@ -360,7 +351,7 @@ impl<'a> BuilderStatePair<'a> {
             Self::traverse_field_to_where_predicate,
         );
         Self {
-            main_ident,
+            builder_ident: Rc::clone(builder_ident),
             ident,
             ty: &field.syn.ty,
             field_to_main_lifetimes,

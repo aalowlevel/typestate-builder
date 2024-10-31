@@ -15,6 +15,7 @@ where
 }
 
 #[derive(TypestateBuilder)]
+#[ts_builder(custom_builder_name = "aaa")]
 struct ComplexTuple<'a, T, U, V>(
     T,                 // Generic type T
     &'a U,             // Reference to type U with lifetime 'a

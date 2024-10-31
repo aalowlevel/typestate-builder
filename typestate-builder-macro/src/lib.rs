@@ -39,7 +39,7 @@ use syn::{parse_macro_input, DeriveInput};
 ///
 /// # Panics
 /// This macro will panic if applied to a non-struct type (such as an enum or union).
-#[proc_macro_derive(TypestateBuilder)]
+#[proc_macro_derive(TypestateBuilder, attributes(ts_builder))]
 #[proc_macro_error]
 pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     // Parse the input token stream into a `DeriveInput` structure.
