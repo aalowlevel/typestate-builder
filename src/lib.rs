@@ -18,18 +18,18 @@
 
 `TypestateBuilder` is a Rust procedural macro that enables the creation of builder patterns using the typestate design pattern. This macro ensures that your structs are built in a way that enforces compile-time safety, ensuring that required fields are initialized before the struct is created.
 
-## Table of Contents
+# Table of Contents
 
 - [Features](#features)
-- [Usage](#usage)
-  - [Deriving the Macro](#deriving-the-macro)
-  - [Example](#example)
+- [Example](#example)
 - [How It Works](#how-it-works)
 - [Code Expanded](#code-expanded)
+- [Configuration Options](#configuration-options)
+- [Field Configuration Options](#field-configuration-options)
 - [Possible Limitations](#possible-limitations)
 - [License](#license)
 
-## Features
+# Features
 
 - Enforced Typestate Pattern: Leveraging Rust's type system, the macro ensures that required fields are set before a struct can be created.
 - No Runtime Checks: The macro generates the necessary types and performs checks at compile time, eliminating the need for Option or Result types.
@@ -37,7 +37,7 @@
 - Support for Named and Tuple Structs: Works seamlessly with both named and tuple structs, with clear error messages for unsupported configurations.
 - Fluent and Intuitive Syntax: Offers a simple and idiomatic Rust syntax for creating builders, enhancing code readability and usability.
 
-## Example
+# Example
 
 Here’s a basic example demonstrating how to use the `TypestateBuilder` macro:
 
@@ -61,7 +61,7 @@ println!("Created person: {:?}", person);
 
 In this example, the Person struct uses the `TypestateBuilder` derive macro to create a builder. Each field can be set in a fluent interface style, and the build method assembles the `Person` instance once all required fields have been set.
 
-## How It Works
+# How It Works
 
 - State Management: The macro generates intermediate state structs for each field of the struct being built. Each state struct represents a stage in the building process.
 
@@ -71,7 +71,7 @@ In this example, the Person struct uses the `TypestateBuilder` derive macro to c
 
 - Graph analysis: This crate internally analyzes the sub-elements of structures with graph and describes the relationships between them. Thus, the source of the final generated code is derived from this analysis.
 
-## Code Expanded
+# Code Expanded
 
 The expanded version of the above code is like this:
 
@@ -160,11 +160,35 @@ impl PersonBuilder<
 }
 ```
 
-## Possible Limitations
+# Configuration Options
+
+The macro supports configuration through attributes:
+
+```rust
+#[derive(TypestateBuilder)]
+#[typestate_builder(
+    builder_type = "PersonFactory",    // Custom builder type name
+    builder_method = "create"          // Custom builder method name
+)]
+struct Person {
+    name: String,
+    age: u32,
+}
+```
+
+## Available Attributes
+* `builder_type`: Customize the generated builder struct name. Default: `{OriginalType}Builder`. Value must be a valid type name and is automatically converted to title case.
+* `builder_method`: Customize the method name that creates a new builder. Default: `builder`. Value must be a valid method name and is automatically converted to lowercase.
+
+# Field Configuration Options
+
+
+
+# Possible Limitations
 
 In fact, I’m not entirely sure what the upper limit is for the most complex struct that this crate can handle. However, I’ve added [dozens of complex structs here](https://github.com/aalowlevel/typestate-builder/blob/master/src/lib.rs) for testing purposes, and the crate successfully handles all of them. If you have any new ideas for testing structs, feel free to send me a PR.
 
-## License
+# License
 
 `TypestateBuilder` is dual-licensed under the MIT and Apache 2.0 licenses. See the LICENSE-MIT and LICENSE-APACHE files for details.
 Derive-macro-based generator that combines `Typestate` and `Builder` patterns. */
