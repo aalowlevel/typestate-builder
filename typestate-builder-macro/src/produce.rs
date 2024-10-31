@@ -216,6 +216,12 @@ mod builder_new_impl {
         let StructElement::Ident(ident) = &graph[*ix] else {
             panic!("{}", msg::node::IDENT);
         };
+        let Some(ix) = map.get(mapkey::uniq::METHOD_BUILDER_IDENT) else {
+            panic!("{}", msg::ix::METHOD_BUILDER_IDENT);
+        };
+        let StructElement::MethodBuilderIdent(mb_ident) = &graph[*ix] else {
+            panic!("{}", msg::node::METHOD_BUILDER_IDENT);
+        };
         let Some(ix) = map.get(mapkey::uniq::BUILDER_IDENT) else {
             panic!("{}", msg::ix::BUILDER_IDENT);
         };
@@ -351,7 +357,7 @@ mod builder_new_impl {
 
                     quote! {
                         impl #first #ident #second #where_clause {
-                            #vis fn builder() -> #builder_ident #return_type_generics  {
+                            #vis fn #mb_ident() -> #builder_ident #return_type_generics  {
                                 #builder_ident {
                                     #(#constructor_fields),*
                                 }
@@ -361,7 +367,7 @@ mod builder_new_impl {
                 } else {
                     quote! {
                         impl #first #ident #second #where_clause {
-                            #vis fn builder() -> #builder_ident  {
+                            #vis fn #mb_ident() -> #builder_ident  {
                                 #builder_ident {}
                             }
                         }
@@ -378,7 +384,7 @@ mod builder_new_impl {
 
                     quote! {
                         impl #first #ident #second #where_clause {
-                            #vis fn builder() -> #builder_ident #return_type_generics  {
+                            #vis fn #mb_ident() -> #builder_ident #return_type_generics  {
                                 #builder_ident ( #(#empties),* )
                             }
                         }
@@ -386,7 +392,7 @@ mod builder_new_impl {
                 } else {
                     quote! {
                         impl #first #ident #second #where_clause {
-                            #vis fn builder() -> #builder_ident  {
+                            #vis fn #mb_ident() -> #builder_ident  {
                                 #builder_ident ()
                             }
                         }

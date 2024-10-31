@@ -4,18 +4,18 @@ use typestate_builder::TypestateBuilder;
 
 fn main() {}
 
-#[derive(TypestateBuilder)]
-struct NestedGenerics<'a, T, U>
-where
-    T: 'a + Copy + Clone,
-    U: 'a + AsRef<T> + Clone,
-{
-    value: &'a T,
-    ref_container: U,
-}
+// #[derive(TypestateBuilder)]
+// struct NestedGenerics<'a, T, U>
+// where
+//     T: 'a + Copy + Clone,
+//     U: 'a + AsRef<T> + Clone,
+// {
+//     value: &'a T,
+//     ref_container: U,
+// }
 
 #[derive(TypestateBuilder)]
-#[ts_builder(custom_builder_name = "aaa")]
+#[typestate_builder(builder_type = "aaa", builder_method = "bbb")]
 struct ComplexTuple<'a, T, U, V>(
     T,                 // Generic type T
     &'a U,             // Reference to type U with lifetime 'a

@@ -48,14 +48,29 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
     let mut map = IndexMap::new();
 
     /* ✅ #TD80531813 Set options */
-    let parse_main_options = parse_main_options(&input.attrs);
-    let ident = if let Some(custom_builder_name) = &parse_main_options.custom_builder_name {
-        format_ident!("{}", custom_builder_name)
-    } else {
-        format_ident!("{}Builder", input.ident)
-    };
-    let ix = graph.add_node(StructElement::BuilderIdent(Rc::new(ident)));
-    map.insert(mapkey::uniq::BUILDER_IDENT.to_string(), ix);
+    let parse_main_options = ParseMainOptions::new(input.attrs);
+
+    /* ✅ #TD24693499 Describe builder type ident. */
+    {
+        let ident = if let Some(builder_type) = &parse_main_options.builder_type {
+            format_ident!("{}", builder_type)
+        } else {
+            format_ident!("{}Builder", input.ident)
+        };
+        let ix = graph.add_node(StructElement::BuilderIdent(Rc::new(ident)));
+        map.insert(mapkey::uniq::BUILDER_IDENT.to_string(), ix);
+    }
+
+    /* ✅ #TD28740689 Describe builder method name. */
+    {
+        let ident = if let Some(builder_method) = &parse_main_options.builder_method {
+            format_ident!("{}", builder_method)
+        } else {
+            format_ident!("builder")
+        };
+        let ix = graph.add_node(StructElement::MethodBuilderIdent(Rc::new(ident)));
+        map.insert(mapkey::uniq::METHOD_BUILDER_IDENT.to_string(), ix);
+    }
 
     // Beginning
     {
@@ -65,7 +80,6 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
         map.insert(mapkey::uniq::IDENT.to_string(), ix);
     }
 
-    add_from_list!(graph, map, input.attrs, Attribute, AttributeTrain);
     let generics = input
         .generics
         .params
@@ -148,39 +162,63 @@ pub fn run(input: DeriveInput) -> (StructGraph, IndexMap<String, NodeIndex>) {
     (graph, map)
 }
 
+#[derive(Default)]
 struct ParseMainOptions {
-    custom_builder_name: Option<String>,
+    builder_type: Option<String>,
+    builder_method: Option<String>,
 }
 
-fn parse_main_options(attrs: &[syn::Attribute]) -> ParseMainOptions {
-    let mut parse_main_args = ParseMainOptions {
-        custom_builder_name: None,
-    };
+/// Parser for the entire attribute content
+struct AttributeArgs {
+    pairs: syn::punctuated::Punctuated<syn::MetaNameValue, syn::Token![,]>,
+}
 
-    // Capture `ts_builder` attributes specified in the struct
-    for attr in attrs.iter() {
-        if !attr.path().is_ident("ts_builder") {
-            continue;
-        }
+impl syn::parse::Parse for AttributeArgs {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        Ok(Self {
+            pairs: syn::punctuated::Punctuated::parse_terminated(input)?,
+        })
+    }
+}
 
-        if let Err(e) = attr.parse_nested_meta(|parse_nested_meta| {
-            if parse_nested_meta.path.is_ident("custom_builder_name") {
-                let Ok(value) = parse_nested_meta.value() else {
-                    panic!("This attribute must be key = \"value\" syntax.");
-                };
-                let Ok(lit_str) = value.parse::<syn::LitStr>() else {
-                    panic!("Inparsable attribute.");
-                };
-                let titlecase = helper::string::to_titlecase(&lit_str.value());
-                parse_main_args.custom_builder_name = Some(titlecase);
-                return Ok(());
+impl ParseMainOptions {
+    fn new(attrs: Vec<syn::Attribute>) -> Self {
+        let mut parse_main_args = ParseMainOptions::default();
+
+        // Capture `typestate_builder` attributes specified in the struct
+        for attr in attrs {
+            if !attr.path().is_ident("typestate_builder") {
+                continue;
             }
+            let syn::Meta::List(meta_list) = attr.meta else {
+                panic!("typestate_builder attribute must be a list.")
+            };
 
-            panic!("Invalid attributes. Available names:\n- custom_builder_name")
-        }) {
-            panic!("{}", e);
+            if let Ok(attrs) = syn::parse2::<AttributeArgs>(meta_list.tokens) {
+                for pair in attrs.pairs {
+                    if pair.path.is_ident("builder_type") {
+                        let lit_str = Self::value_litstr_validation(pair);
+                        let titlecase = helper::string::to_titlecase(&lit_str.value());
+                        parse_main_args.builder_type = Some(titlecase);
+                    } else if pair.path.is_ident("builder_method") {
+                        let lit_str = Self::value_litstr_validation(pair);
+                        parse_main_args.builder_method = Some(lit_str.value().to_lowercase());
+                    }
+                }
+            }
         }
+
+        parse_main_args
     }
 
-    parse_main_args
+    fn value_litstr_validation(pair: syn::MetaNameValue) -> syn::LitStr {
+        let syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Str(lit_str),
+            ..
+        }) = pair.value
+        else {
+            panic!("This attribute must be key = \"value\" syntax.");
+        };
+        lit_str
+    }
 }

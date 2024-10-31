@@ -34,6 +34,7 @@ pub mod mapkey {
         pub const VIS: &str = "Visibility";
         pub const IDENT: &str = "Ident";
         pub const TYPE: &str = "Type";
+        pub const METHOD_BUILDER_IDENT: &str = "MethodBuilderIdent";
         pub const BUILDER_IDENT: &str = "BuilderIdent";
     }
 }
@@ -41,6 +42,7 @@ pub mod mapkey {
 pub mod msg {
     pub mod ix {
         pub const IDENT: &str = "There must be ident node.";
+        pub const METHOD_BUILDER_IDENT: &str = "There must be method builder ident node.";
         pub const BUILDER_IDENT: &str = "There must be builder ident node.";
         pub const VIS: &str = "There must be visibility node.";
         pub const TYPE: &str = "There must be type node.";
@@ -52,6 +54,7 @@ pub mod msg {
         pub const FIELD: &str = "Node must be a field.";
         pub const GENERIC: &str = "Node must be a generic.";
         pub const WP: &str = "Node must be a Where Predicate.";
+        pub const METHOD_BUILDER_IDENT: &str = "Node must be a method builder ident.";
         pub const BUILDER_IDENT: &str = "Node must be a builder ident.";
     }
 }
@@ -59,11 +62,11 @@ pub mod msg {
 pub enum StructElement {
     Visibility(syn::Visibility),
     Ident(syn::Ident),
-    Attribute(syn::Attribute),
     Generic(GenericParam),
     WherePredicate(WherePredicate),
     Field(Field),
     Type(StructType),
+    MethodBuilderIdent(Rc<syn::Ident>),
     BuilderStateEmpty(Rc<syn::Ident>),
     BuilderStateAdded(Rc<BuilderStateAdded>),
     BuilderIdent(Rc<syn::Ident>),
@@ -86,12 +89,6 @@ impl Serialize for StructElement {
             StructElement::Ident(_ident) => {
                 serializer.serialize_newtype_variant("StructElement", 0, "Ident", &json!("Ident"))
             }
-            StructElement::Attribute(_attribute) => serializer.serialize_newtype_variant(
-                "StructElement",
-                0,
-                "Attribute",
-                &json!("Attribute"),
-            ),
             StructElement::Generic(generic_param) => serializer.serialize_newtype_variant(
                 "StructElement",
                 0,
@@ -110,6 +107,12 @@ impl Serialize for StructElement {
             StructElement::Type(struct_type) => {
                 serializer.serialize_newtype_variant("StructElement", 0, "Type", &struct_type)
             }
+            StructElement::MethodBuilderIdent(ident) => serializer.serialize_newtype_variant(
+                "StructElement",
+                0,
+                "MethodBuilderIdent",
+                &json!(ident.to_string()),
+            ),
             StructElement::BuilderStateEmpty(ident) => serializer.serialize_newtype_variant(
                 "StructElement",
                 0,
@@ -163,7 +166,6 @@ pub enum StructType {
 
 #[derive(Debug, PartialEq)]
 pub enum StructRelation {
-    AttributeTrain,
     GenericTrain,
     WherePredicateTrain,
     FieldTrain,
