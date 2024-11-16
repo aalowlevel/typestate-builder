@@ -11,33 +11,41 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
+use std::rc::Rc;
+
 use indexmap::IndexMap;
 use petgraph::graph::NodeIndex;
-use syn::{GenericParam, WherePredicate};
+use proc_macro2::Span;
 
 use crate::{
-    graph::{mapkey, msg, traverse_mut, StructElement, StructGraph, StructRelation},
+    graph::{
+        mapkey, msg, traverse_mut, FeatureWherePredicate, StructElement, StructGraph,
+        StructRelation,
+    },
     helper::extract_ident,
 };
 
-pub fn run(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex>) {
+pub fn run(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>) {
     bind_field_elements(graph, map);
     bind_where_predicate_elements(graph, map);
 }
 
-fn bind_field_elements(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex>) {
-    if let Some(start) = map.get(mapkey::startp::FIELD) {
+fn bind_field_elements(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>) {
+    let start = map.get(mapkey::startp::FIELD).cloned();
+    if let Some(start) = start {
         let action = |graph: &mut StructGraph, _edge, node_field| {
             list_field_assets(graph, node_field);
             traversal_field_to_generics(graph, node_field, map);
             traversal_field_to_where_clause(graph, node_field, map);
+            add_feature_default_in_wp(graph, node_field, map);
         };
-        traverse_mut(graph, &[&StructRelation::FieldTrain], *start, true, action);
+        traverse_mut(graph, &[&StructRelation::FieldTrain], start, true, action);
     }
 }
 
-fn bind_where_predicate_elements(graph: &mut StructGraph, map: &IndexMap<String, NodeIndex>) {
-    if let Some(start) = map.get(mapkey::startp::WP) {
+fn bind_where_predicate_elements(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>) {
+    let start = map.get(mapkey::startp::WP).cloned();
+    if let Some(start) = start {
         let action = |graph: &mut StructGraph, _edge, node_wp| {
             list_wp_assets(graph, node_wp);
             traversal_wp_to_generics(graph, node_wp, map);
@@ -45,7 +53,7 @@ fn bind_where_predicate_elements(graph: &mut StructGraph, map: &IndexMap<String,
         traverse_mut(
             graph,
             &[&StructRelation::WherePredicateTrain],
-            *start,
+            start,
             true,
             action,
         );
@@ -80,7 +88,7 @@ fn list_wp_assets(graph: &mut StructGraph, wp_field: NodeIndex) {
 fn traversal_field_to_generics(
     graph: &mut StructGraph,
     node_field: NodeIndex,
-    map: &IndexMap<String, NodeIndex>,
+    map: &mut IndexMap<String, NodeIndex>,
 ) {
     if let Some(start) = map.get(mapkey::startp::GENERICS) {
         let action = |graph: &mut StructGraph, _edge, node_generic| {
@@ -105,9 +113,9 @@ fn search_in_generics_by_field(
         panic!("{}", msg::node::GENERIC);
     };
     let generic_ident = match generic.syn.as_ref() {
-        GenericParam::Lifetime(lifetime_param) => &lifetime_param.lifetime.ident,
-        GenericParam::Type(type_param) => &type_param.ident,
-        GenericParam::Const(const_param) => &const_param.ident,
+        syn::GenericParam::Lifetime(lifetime_param) => &lifetime_param.lifetime.ident,
+        syn::GenericParam::Type(type_param) => &type_param.ident,
+        syn::GenericParam::Const(const_param) => &const_param.ident,
     };
     let StructElement::Field(field) = &graph[node_field] else {
         panic!("{}", msg::node::FIELD);
@@ -151,7 +159,7 @@ fn search_in_generics_by_field(
 fn traversal_field_to_where_clause(
     graph: &mut StructGraph,
     node_field: NodeIndex,
-    map: &IndexMap<String, NodeIndex>,
+    map: &mut IndexMap<String, NodeIndex>,
 ) {
     if let Some(start) = map.get(mapkey::startp::WP) {
         let action = |graph: &mut StructGraph, _edge, node_wp| {
@@ -167,14 +175,90 @@ fn traversal_field_to_where_clause(
         );
     }
 }
+
+fn add_feature_default_in_wp(
+    graph: &mut StructGraph,
+    node_field: NodeIndex,
+    map: &mut IndexMap<String, NodeIndex>,
+) {
+    let StructElement::Field(field) = &mut graph[node_field] else {
+        panic!("{}", msg::node::FIELD);
+    };
+
+    if field.default {
+        let mut nth = 0;
+        let mut node_head = None;
+
+        traverse_mut(
+            graph,
+            &[&StructRelation::FieldGenericInMainType],
+            node_field,
+            false,
+            |graph, _, node| {
+                let StructElement::Generic(generic) = &graph[node] else {
+                    panic!("{}", msg::node::GENERIC);
+                };
+
+                /* ✅ #TD48204866 Add default bound in feature where clause. */
+                if let syn::GenericParam::Type(syn::TypeParam { ident, .. }) = generic.syn.as_ref()
+                {
+                    /* ✅ #TD45379208 Create default bound. */
+                    let default_trait_bound = syn::TypeParamBound::Trait(syn::TraitBound {
+                        paren_token: None,
+                        modifier: syn::TraitBoundModifier::None,
+                        lifetimes: None,
+                        path: syn::Path::from(syn::Ident::new("SomeTrait", Span::call_site())),
+                    });
+                    let mut bounds = syn::punctuated::Punctuated::new();
+                    bounds.push(default_trait_bound);
+
+                    /* ✅ #TD65080481 Create type and syn of wp. */
+                    let path = syn::Path::from(ident.clone());
+                    let syn = Rc::new(syn::PredicateType {
+                        lifetimes: None,
+                        bounded_ty: syn::Type::Path(syn::TypePath { qself: None, path }),
+                        colon_token: syn::token::Colon::default(),
+                        bounds,
+                    });
+
+                    /* ✅ #TD03009407 Compile wp. */
+                    let fwp = FeatureWherePredicate::Default { nth, syn };
+
+                    /* ✅ #TD11692816 Add node. */
+                    let new_ix = graph.add_node(StructElement::FeatureWherePredicate(fwp));
+
+                    /* ✅ #TD29393092 Add edge. */
+                    if let Some(node_head) = node_head {
+                        graph.add_edge(
+                            node_head,
+                            new_ix,
+                            StructRelation::FeatureWherePredicateTrain,
+                        );
+                    } else {
+                        node_head = Some(new_ix);
+                    }
+
+                    /* ✅ #TD31296209 Insert into map. */
+                    let key = format!("FeatureWherePredicate{}", nth);
+                    map.insert(key, new_ix);
+
+                    nth += 1;
+                }
+            },
+        );
+    }
+}
+
 /** Checks whether any element in the field is defined in where clause of the generics. If it is defined, establishes a connection. */
 fn search_in_wp_by_field(graph: &mut StructGraph, node_field: NodeIndex, node_wp: NodeIndex) {
     let StructElement::WherePredicate(wp) = &graph[node_wp] else {
         panic!("{}", msg::node::WP);
     };
     let wp_ident = match wp.syn.as_ref() {
-        WherePredicate::Lifetime(predicate_lifetime) => Some(&predicate_lifetime.lifetime.ident),
-        WherePredicate::Type(predicate_type) => extract_ident(&predicate_type.bounded_ty),
+        syn::WherePredicate::Lifetime(predicate_lifetime) => {
+            Some(&predicate_lifetime.lifetime.ident)
+        }
+        syn::WherePredicate::Type(predicate_type) => extract_ident(&predicate_type.bounded_ty),
         _ => None,
     };
     let StructElement::Field(field) = &graph[node_field] else {
@@ -203,7 +287,7 @@ fn search_in_wp_by_field(graph: &mut StructGraph, node_field: NodeIndex, node_wp
 fn traversal_wp_to_generics(
     graph: &mut StructGraph,
     node_wp: NodeIndex,
-    map: &IndexMap<String, NodeIndex>,
+    map: &mut IndexMap<String, NodeIndex>,
 ) {
     if let Some(start) = map.get(mapkey::startp::GENERICS) {
         let action = |graph: &mut StructGraph, _edge, node_generic| {
@@ -227,7 +311,7 @@ fn search_in_generics_by_wp(graph: &mut StructGraph, node_wp: NodeIndex, node_ge
         panic!("{}", msg::node::WP);
     };
     match generic.syn.as_ref() {
-        GenericParam::Lifetime(lifetime_param) => {
+        syn::GenericParam::Lifetime(lifetime_param) => {
             let mut left = false;
             let mut right = false;
 
@@ -257,7 +341,7 @@ fn search_in_generics_by_wp(graph: &mut StructGraph, node_wp: NodeIndex, node_ge
                 );
             }
         }
-        GenericParam::Type(type_param) => {
+        syn::GenericParam::Type(type_param) => {
             let mut left = false;
             let mut right = false;
             let mut right_phantom = false;
@@ -311,6 +395,6 @@ fn search_in_generics_by_wp(graph: &mut StructGraph, node_wp: NodeIndex, node_ge
                 );
             }
         }
-        GenericParam::Const(_const_param) => {}
+        syn::GenericParam::Const(_const_param) => {}
     }
 }

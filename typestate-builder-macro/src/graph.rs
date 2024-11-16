@@ -29,6 +29,7 @@ pub mod mapkey {
         pub const GENERICS: &str = "Generic0";
         pub const WP: &str = "WherePredicate0";
         pub const BUILDER_FIELD: &str = "BuilderField0";
+        pub const FEATURE_WP: &str = "FeatureWherePredicate0";
     }
     pub mod uniq {
         pub const VIS: &str = "Visibility";
@@ -56,6 +57,7 @@ pub mod msg {
         pub const WP: &str = "Node must be a Where Predicate.";
         pub const METHOD_BUILDER_IDENT: &str = "Node must be a method builder ident.";
         pub const BUILDER_IDENT: &str = "Node must be a builder ident.";
+        pub const FEATURE_WP: &str = "Node must be a Feature Where Predicate.";
     }
 }
 
@@ -72,6 +74,7 @@ pub enum StructElement {
     BuilderIdent(Rc<syn::Ident>),
     BuilderField(Rc<syn::Ident>),
     BuilderGeneric(Rc<syn::Ident>),
+    FeatureWherePredicate(FeatureWherePredicate),
 }
 
 impl Serialize for StructElement {
@@ -144,6 +147,13 @@ impl Serialize for StructElement {
                 "BuilderGeneric",
                 &json!(ident.to_string()),
             ),
+            StructElement::FeatureWherePredicate(feature_where_predicate) => serializer
+                .serialize_newtype_variant(
+                    "StructElement",
+                    0,
+                    "FeatureWherePredicate",
+                    feature_where_predicate,
+                ),
         }
     }
 }
@@ -184,6 +194,7 @@ pub enum StructRelation {
     BuilderFieldToBuilderState,
     BuilderGenericTrain,
     BuilderStatePair,
+    FeatureWherePredicateTrain,
 }
 
 pub type StructGraph = Graph<StructElement, StructRelation>;
@@ -389,6 +400,7 @@ impl Serialize for GenericParam {
     }
 }
 
+/* ♻️ REFACTOR #RF45190356 Eliminate Option<Vec<T>>'s */
 pub struct WherePredicate {
     pub nth: usize,
     pub syn: Rc<syn::WherePredicate>,
@@ -581,6 +593,35 @@ impl Serialize for BuilderStateAdded {
         res.skip_field("where_predicates")?;
         res.skip_field("phantoms")?;
         res.end()
+    }
+}
+
+pub enum FeatureWherePredicate {
+    Default {
+        nth: usize,
+        syn: Rc<syn::PredicateType>,
+    },
+}
+
+impl Serialize for FeatureWherePredicate {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            FeatureWherePredicate::Default { nth, syn } => {
+                // Serialize the "Default" variant as a struct with a field "syn"
+                let mut res = serializer.serialize_struct("FeatureWherePredicate", 2)?;
+                res.serialize_field("variant", "Default")?;
+                res.serialize_field("nth", nth)?;
+                if let syn::Type::Path(path) = &syn.bounded_ty {
+                    if let Some(ident) = path.path.get_ident() {
+                        res.serialize_field("bounded_ty_ident", &ident.to_string())?;
+                    }
+                }
+                res.end()
+            }
+        }
     }
 }
 
