@@ -672,8 +672,7 @@ mod builder_build_impl {
             panic!("{}", msg::node::TYPE);
         };
 
-        let generics = Generics::new(graph, map);
-        let (gfirst, gsecond, gmethod) = match generics {
+        let (gfirst, gsecond, gmethod) = match Generics::new(graph, map) {
             Some(Generics {
                 first,
                 second,
@@ -681,140 +680,32 @@ mod builder_build_impl {
             }) => (Some(first), Some(second), Some(method)),
             None => (None, None, None),
         };
+        let where_clause =
+            WhereClause::new(graph, map).map(|WhereClause(where_clause)| where_clause);
+        let (fields, addeds) = match Collections::new(graph, map, ty) {
+            Some(Collections { fields, addeds }) => (Some(fields), Some(addeds)),
+            None => (None, None),
+        };
 
-        let where_clause = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
-            let addeds = traverse(
-                graph,
-                &[
-                    &StructRelation::BuilderStatePair,
-                    &StructRelation::BuilderFieldToBuilderState,
-                    &StructRelation::BuilderFieldTrain,
-                ],
-                *start,
-                true,
-                |graph, _edge, node| {
-                    if let StructElement::BuilderStateAdded(rc) = &graph[node] {
-                        Some(Rc::clone(rc))
-                    } else {
-                        None
-                    }
-                },
-            );
-
-            /* ✅ DEBUGGED #BG46782643 Recieve wp's from added.
-            When Higher-ranked trait bounds with orphans are used,
-            rename each parameter to distinguish it from the others. */
-            let wps = addeds
-                .into_iter()
-                .flatten()
-                .flat_map(|added| rename_orphans(Rc::clone(&added)))
-                .map(|f| match f {
-                    WPOwnedOrShared::Owned(where_predicate) => quote! { #where_predicate },
-                    WPOwnedOrShared::Shared(rc) => quote! { #rc },
-                })
-                .collect::<Vec<_>>();
-
-            if !wps.is_empty() {
-                quote! { where #(#wps),* }
-            } else {
-                quote! {}
-            }
-        });
-
-        let collections = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
-            let mut fields = Vec::new();
-            let mut addeds = Vec::new();
-            let action =
-                |graph: &StructGraph, _edge, node_builder_field| match &graph[node_builder_field] {
-                    StructElement::BuilderStateAdded(rc) => {
-                        addeds.push(Rc::clone(rc));
-                    }
-                    StructElement::BuilderField(rc) => {
-                        fields.push(Rc::clone(rc));
-                    }
-                    _ => {}
-                };
-            traverse(
-                graph,
-                &[
-                    &StructRelation::BuilderStatePair,
-                    &StructRelation::BuilderFieldToBuilderState,
-                    &StructRelation::BuilderFieldTrain,
-                ],
-                *start,
-                true,
-                action,
-            );
-            let fields = fields
-                .into_iter()
-                .enumerate()
-                .map(|(i, field)| match ty {
-                    StructType::Named => quote! { #field: self.#field.0 },
-                    StructType::Unnamed => {
-                        let i = syn::Index::from(i);
-                        quote! { self.#i.0 }
-                    }
-                })
-                .collect::<Vec<_>>();
-            let addeds = if !addeds.is_empty() {
-                let addeds = addeds
-                    .into_iter()
-                    .map(|added| {
-                        let ident = &added.ident;
-                        let generics = if !added.generics.is_empty() {
-                            let mut agts = Vec::with_capacity(added.generics.len());
-                            for generic in &added.generics {
-                                match generic.as_ref() {
-                                    syn::GenericParam::Lifetime(lifetime_param) => {
-                                        let lt = &lifetime_param.lifetime;
-                                        agts.push(quote! { #lt });
-                                    }
-                                    syn::GenericParam::Type(type_param) => {
-                                        let ident = &type_param.ident;
-                                        agts.push(quote! { #ident });
-                                    }
-                                    syn::GenericParam::Const(const_param) => {
-                                        let ident = &const_param.ident;
-                                        agts.push(quote! { #ident });
-                                    }
-                                }
-                            }
-                            quote! { <#(#agts),*> }
-                        } else {
-                            quote! {}
-                        };
-                        quote! { #ident #generics }
-                    })
-                    .collect::<Vec<_>>();
-                quote! { <#(#addeds),*> }
-            } else {
-                quote! {}
-            };
-            (fields, addeds)
-        });
-
-        match (ty, collections) {
-            (StructType::Named, Some((fields, addeds))) => {
+        match ty {
+            StructType::Named => {
                 quote! {
                     impl #gfirst #builder_ident #addeds #where_clause {
                         #vis fn build #gmethod (self) -> #ident #gsecond {
-                            #ident {
-                                #(#fields),*
-                            }
+                            #ident { #fields }
                         }
                     }
                 }
             }
-            (StructType::Unnamed, Some((fields, addeds))) => {
+            StructType::Unnamed => {
                 quote! {
                     impl #gfirst #builder_ident #addeds #where_clause {
                         #vis fn build #gmethod (self) -> #ident #gsecond {
-                            #ident ( #(#fields),* )
+                            #ident ( #fields )
                         }
                     }
                 }
             }
-            _ => quote! {},
         }
     }
 
@@ -892,6 +783,131 @@ mod builder_build_impl {
             } else {
                 None
             }
+        }
+    }
+
+    struct WhereClause(TokenStream2);
+
+    impl WhereClause {
+        fn new(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> Option<Self> {
+            let start = map.get(mapkey::startp::BUILDER_FIELD)?;
+
+            // Traverse to gather the added builder states
+            let action = |graph: &StructGraph, _edge, node| {
+                if let StructElement::BuilderStateAdded(rc) = &graph[node] {
+                    Some(Rc::clone(rc))
+                } else {
+                    None
+                }
+            };
+            let addeds = traverse(
+                graph,
+                &[
+                    &StructRelation::BuilderStatePair,
+                    &StructRelation::BuilderFieldToBuilderState,
+                    &StructRelation::BuilderFieldTrain,
+                ],
+                *start,
+                true,
+                action,
+            );
+
+            // Flatten and process the added builder states into where predicates
+            let wps = addeds
+                .into_iter()
+                .flatten()
+                .flat_map(|added| rename_orphans(Rc::clone(&added)))
+                .map(|f| match f {
+                    WPOwnedOrShared::Owned(where_predicate) => quote! { #where_predicate },
+                    WPOwnedOrShared::Shared(rc) => quote! { #rc },
+                })
+                .collect::<Vec<_>>(); // Collect the results into a vector
+
+            // If there are any where predicates, generate the where clause
+            if !wps.is_empty() {
+                Some(Self(quote! { where #(#wps),* }))
+            } else {
+                None
+            }
+        }
+    }
+
+    struct Collections {
+        fields: TokenStream2,
+        addeds: TokenStream2,
+    }
+
+    impl Collections {
+        fn new(
+            graph: &StructGraph,
+            map: &IndexMap<String, NodeIndex>,
+            ty: &StructType,
+        ) -> Option<Self> {
+            let start = map.get(mapkey::startp::BUILDER_FIELD)?;
+
+            let mut fields = TokenStream2::new();
+            let mut fields_i = 0;
+            let mut addeds = TokenStream2::new();
+
+            let action =
+                |graph: &StructGraph, _edge, node_builder_field| match &graph[node_builder_field] {
+                    StructElement::BuilderField(field) => {
+                        let new_field = match ty {
+                            StructType::Named => quote! { #field: self.#field.0, },
+                            StructType::Unnamed => {
+                                let fields_i = syn::Index::from(fields_i);
+                                quote! { self.#fields_i.0, }
+                            }
+                        };
+                        fields.extend(new_field);
+                        fields_i += 1;
+                    }
+                    StructElement::BuilderStateAdded(added) => {
+                        let ident = &added.ident;
+                        let generics = if !added.generics.is_empty() {
+                            let mut added_generics = TokenStream2::new();
+                            for generic in &added.generics {
+                                match generic.as_ref() {
+                                    syn::GenericParam::Lifetime(lifetime_param) => {
+                                        let lt = &lifetime_param.lifetime;
+                                        added_generics.extend(quote! { #lt, });
+                                    }
+                                    syn::GenericParam::Type(type_param) => {
+                                        let ident = &type_param.ident;
+                                        added_generics.extend(quote! { #ident, });
+                                    }
+                                    syn::GenericParam::Const(const_param) => {
+                                        let ident = &const_param.ident;
+                                        added_generics.extend(quote! { #ident, });
+                                    }
+                                }
+                            }
+                            Some(quote! { <#added_generics> })
+                        } else {
+                            None
+                        };
+                        addeds.extend(quote! { #ident #generics, });
+                    }
+                    _ => {}
+                };
+
+            traverse(
+                graph,
+                &[
+                    &StructRelation::BuilderStatePair,
+                    &StructRelation::BuilderFieldToBuilderState,
+                    &StructRelation::BuilderFieldTrain,
+                ],
+                *start,
+                true,
+                action,
+            );
+            let addeds = if !addeds.is_empty() {
+                quote! { <#addeds> }
+            } else {
+                quote! {}
+            };
+            Some(Self { fields, addeds })
         }
     }
 
