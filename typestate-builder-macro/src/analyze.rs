@@ -37,7 +37,7 @@ fn bind_field_elements(graph: &mut StructGraph, map: &mut IndexMap<String, NodeI
             list_field_assets(graph, node_field);
             traversal_field_to_generics(graph, node_field, map);
             traversal_field_to_where_clause(graph, node_field, map);
-            add_feature_default_in_wp(graph, node_field, map);
+            add_feature_default(graph, node_field, map);
         };
         traverse_mut(graph, &[&StructRelation::FieldTrain], start, true, action);
     }
@@ -176,7 +176,7 @@ fn traversal_field_to_where_clause(
     }
 }
 
-fn add_feature_default_in_wp(
+fn add_feature_default(
     graph: &mut StructGraph,
     node_field: NodeIndex,
     map: &mut IndexMap<String, NodeIndex>,
@@ -189,62 +189,63 @@ fn add_feature_default_in_wp(
         let mut nth = 0;
         let mut node_head = None;
 
+        let action = |graph: &mut StructGraph, _, node| {
+            let StructElement::Generic(generic) = &graph[node] else {
+                panic!("{}", msg::node::GENERIC);
+            };
+
+            /* ✅ #TD48204866 Add default bound in feature where clause. */
+            if let syn::GenericParam::Type(syn::TypeParam { ident, .. }) = generic.syn.as_ref() {
+                /* ✅ #TD45379208 Create default bound. */
+                let default_trait_bound = syn::TypeParamBound::Trait(syn::TraitBound {
+                    paren_token: None,
+                    modifier: syn::TraitBoundModifier::None,
+                    lifetimes: None,
+                    path: syn::Path::from(syn::Ident::new("SomeTrait", Span::call_site())),
+                });
+                let mut bounds = syn::punctuated::Punctuated::new();
+                bounds.push(default_trait_bound);
+
+                /* ✅ #TD65080481 Create type and syn of wp. */
+                let path = syn::Path::from(ident.clone());
+                let syn = Rc::new(syn::PredicateType {
+                    lifetimes: None,
+                    bounded_ty: syn::Type::Path(syn::TypePath { qself: None, path }),
+                    colon_token: syn::token::Colon::default(),
+                    bounds,
+                });
+
+                /* ✅ #TD03009407 Compile wp. */
+                let fwp = FeatureWherePredicate::Default { nth, syn };
+
+                /* ✅ #TD11692816 Add node. */
+                let new_ix = graph.add_node(StructElement::FeatureWherePredicate(fwp));
+
+                /* ✅ #TD29393092 Add edge. */
+                if let Some(node_head) = node_head {
+                    graph.add_edge(
+                        node_head,
+                        new_ix,
+                        StructRelation::FeatureWherePredicateTrain,
+                    );
+                } else {
+                    node_head = Some(new_ix);
+                }
+
+                /* ✅ #TD31296209 Insert into map. */
+                let key = format!("FeatureWherePredicate{}", nth);
+                map.insert(key, new_ix);
+
+                nth += 1;
+            }
+        };
+
         traverse_mut(
             graph,
             &[&StructRelation::FieldGenericInMainType],
             node_field,
             false,
-            |graph, _, node| {
-                let StructElement::Generic(generic) = &graph[node] else {
-                    panic!("{}", msg::node::GENERIC);
-                };
-
-                /* ✅ #TD48204866 Add default bound in feature where clause. */
-                if let syn::GenericParam::Type(syn::TypeParam { ident, .. }) = generic.syn.as_ref()
-                {
-                    /* ✅ #TD45379208 Create default bound. */
-                    let default_trait_bound = syn::TypeParamBound::Trait(syn::TraitBound {
-                        paren_token: None,
-                        modifier: syn::TraitBoundModifier::None,
-                        lifetimes: None,
-                        path: syn::Path::from(syn::Ident::new("SomeTrait", Span::call_site())),
-                    });
-                    let mut bounds = syn::punctuated::Punctuated::new();
-                    bounds.push(default_trait_bound);
-
-                    /* ✅ #TD65080481 Create type and syn of wp. */
-                    let path = syn::Path::from(ident.clone());
-                    let syn = Rc::new(syn::PredicateType {
-                        lifetimes: None,
-                        bounded_ty: syn::Type::Path(syn::TypePath { qself: None, path }),
-                        colon_token: syn::token::Colon::default(),
-                        bounds,
-                    });
-
-                    /* ✅ #TD03009407 Compile wp. */
-                    let fwp = FeatureWherePredicate::Default { nth, syn };
-
-                    /* ✅ #TD11692816 Add node. */
-                    let new_ix = graph.add_node(StructElement::FeatureWherePredicate(fwp));
-
-                    /* ✅ #TD29393092 Add edge. */
-                    if let Some(node_head) = node_head {
-                        graph.add_edge(
-                            node_head,
-                            new_ix,
-                            StructRelation::FeatureWherePredicateTrain,
-                        );
-                    } else {
-                        node_head = Some(new_ix);
-                    }
-
-                    /* ✅ #TD31296209 Insert into map. */
-                    let key = format!("FeatureWherePredicate{}", nth);
-                    map.insert(key, new_ix);
-
-                    nth += 1;
-                }
-            },
+            action,
         );
     }
 }
