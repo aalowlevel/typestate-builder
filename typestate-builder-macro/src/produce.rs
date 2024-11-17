@@ -672,70 +672,13 @@ mod builder_build_impl {
             panic!("{}", msg::node::TYPE);
         };
 
-        let generics = map.get(mapkey::startp::GENERICS).map(|start| {
-            let generics = traverse(
-                graph,
-                &[&StructRelation::GenericTrain],
-                *start,
-                true,
-                |graph, _edge, node_generic| {
-                    let StructElement::Generic(generic) = &graph[node_generic] else {
-                        panic!("{}", msg::node::GENERIC);
-                    };
-                    let field_conn =
-                        graph
-                            .edges_directed(node_generic, Direction::Incoming)
-                            .any(|p| {
-                                let edge = p.weight();
-                                edge == &StructRelation::FieldGenericInMainType
-                                    || edge == &StructRelation::FieldGenericInMainLifetime
-                                    || edge == &StructRelation::FieldGenericInMainConst
-                            });
-                    (Rc::clone(&generic.syn), field_conn)
-                },
-            );
-
-            if !generics.is_empty() {
-                let mut first = Vec::with_capacity(generics.len());
-                let mut second = Vec::with_capacity(generics.len());
-                let mut gmethod = Vec::with_capacity(generics.len());
-                for (generic, field_connection) in generics {
-                    match generic.as_ref() {
-                        syn::GenericParam::Lifetime(lifetime_param) => {
-                            first.push(quote! { #generic });
-                            let lt = &lifetime_param.lifetime;
-                            second.push(quote! { #lt });
-                        }
-                        syn::GenericParam::Type(type_param) => {
-                            first.push(quote! { #generic });
-                            let ident = &type_param.ident;
-                            second.push(quote! { #ident });
-                        }
-                        /* ✅ DEBUGGED #BG76154394 Const generics that no field uses it
-                        must be generics of the build method. */
-                        syn::GenericParam::Const(const_param) => {
-                            let ident = &const_param.ident;
-                            if !field_connection {
-                                gmethod.push(quote! { #generic });
-                            } else {
-                                first.push(quote! { #generic });
-                            }
-                            second.push(quote! { #ident });
-                        }
-                    }
-                }
-                let gmethod = if !gmethod.is_empty() {
-                    quote! { <#(#gmethod),*> }
-                } else {
-                    quote! {}
-                };
-                (quote! { <#(#first),*> }, quote! { <#(#second),*> }, gmethod)
-            } else {
-                (quote! {}, quote! {}, quote! {})
-            }
-        });
+        let generics = Generics::new(graph, map);
         let (gfirst, gsecond, gmethod) = match generics {
-            Some((gfirst, gsecond, gmethod)) => (Some(gfirst), Some(gsecond), Some(gmethod)),
+            Some(Generics {
+                first,
+                second,
+                method,
+            }) => (Some(first), Some(second), Some(method)),
             None => (None, None, None),
         };
 
@@ -875,6 +818,83 @@ mod builder_build_impl {
         }
     }
 
+    struct Generics {
+        first: TokenStream2,
+        second: TokenStream2,
+        method: TokenStream2,
+    }
+
+    impl Generics {
+        fn new(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> Option<Self> {
+            let start = map.get(mapkey::startp::GENERICS)?;
+
+            let action_generics = |graph: &StructGraph, _edge, node_generic| {
+                let StructElement::Generic(generic) = &graph[node_generic] else {
+                    panic!("{}", msg::node::GENERIC);
+                };
+                let field_conn = graph
+                    .edges_directed(node_generic, Direction::Incoming)
+                    .any(|p| {
+                        let edge = p.weight();
+                        edge == &StructRelation::FieldGenericInMainType
+                            || edge == &StructRelation::FieldGenericInMainLifetime
+                            || edge == &StructRelation::FieldGenericInMainConst
+                    });
+                (Rc::clone(&generic.syn), field_conn)
+            };
+
+            let generics = traverse(
+                graph,
+                &[&StructRelation::GenericTrain],
+                *start,
+                true,
+                action_generics,
+            );
+
+            if !generics.is_empty() {
+                let mut first = TokenStream2::new();
+                let mut second = TokenStream2::new();
+                let mut method = TokenStream2::new();
+
+                for (generic, field_connection) in generics {
+                    match generic.as_ref() {
+                        syn::GenericParam::Lifetime(lifetime_param) => {
+                            first.extend(quote! { #generic, });
+                            let lt = &lifetime_param.lifetime;
+                            second.extend(quote! { #lt, });
+                        }
+                        syn::GenericParam::Type(type_param) => {
+                            first.extend(quote! { #generic, });
+                            let ident = &type_param.ident;
+                            second.extend(quote! { #ident, });
+                        }
+                        syn::GenericParam::Const(const_param) => {
+                            let ident = &const_param.ident;
+                            if !field_connection {
+                                method.extend(quote! { #generic, });
+                            } else {
+                                first.extend(quote! { #generic, });
+                            }
+                            second.extend(quote! { #ident, });
+                        }
+                    }
+                }
+
+                Some(Self {
+                    first: quote! { <#first> },
+                    second: quote! { <#second> },
+                    method: if !method.is_empty() {
+                        quote! { <#method> }
+                    } else {
+                        TokenStream2::new() // Empty TokenStream2 instead of `quote! {}` to keep consistency
+                    },
+                })
+            } else {
+                None
+            }
+        }
+    }
+
     enum WPOwnedOrShared {
         Owned(syn::WherePredicate),
         Shared(Rc<syn::WherePredicate>),
@@ -969,5 +989,41 @@ mod builder_build_impl {
         }
 
         res
+    }
+
+    pub(super) fn feature_default(
+        graph: &StructGraph,
+        map: &IndexMap<String, NodeIndex>,
+    ) -> TokenStream2 {
+        let action_node_fd = |graph: &StructGraph, _, node_fd: NodeIndex| {
+            let StructElement::FeatureDefault(feature) = &graph[node_fd] else {
+                panic!("{}", msg::node::FEATURE_DEFAULT);
+            };
+
+            quote! {}
+        };
+
+        let feature = if let Some(start) = map.get(mapkey::startp::FEATURE_DEFAULT) {
+            let bounds = traverse(
+                graph,
+                &[&StructRelation::FeatureDefaultTrain],
+                *start,
+                true,
+                action_node_fd,
+            );
+
+            if !bounds.is_empty() {
+                Some(quote! {})
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        match feature {
+            Some(feature) => feature,
+            None => quote! {},
+        }
     }
 }

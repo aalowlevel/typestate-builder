@@ -19,8 +19,7 @@ use proc_macro2::Span;
 
 use crate::{
     graph::{
-        mapkey, msg, traverse_mut, FeatureWherePredicate, StructElement, StructGraph,
-        StructRelation,
+        mapkey, msg, traverse_mut, FeatureDefault, StructElement, StructGraph, StructRelation,
     },
     helper::extract_ident,
 };
@@ -216,24 +215,20 @@ fn add_feature_default(
                 });
 
                 /* ✅ #TD03009407 Compile wp. */
-                let fwp = FeatureWherePredicate::Default { nth, syn };
+                let fd = FeatureDefault { nth, syn };
 
                 /* ✅ #TD11692816 Add node. */
-                let new_ix = graph.add_node(StructElement::FeatureWherePredicate(fwp));
+                let new_ix = graph.add_node(StructElement::FeatureDefault(fd));
 
                 /* ✅ #TD29393092 Add edge. */
                 if let Some(node_head) = node_head {
-                    graph.add_edge(
-                        node_head,
-                        new_ix,
-                        StructRelation::FeatureWherePredicateTrain,
-                    );
+                    graph.add_edge(node_head, new_ix, StructRelation::FeatureDefaultTrain);
                 } else {
                     node_head = Some(new_ix);
                 }
 
                 /* ✅ #TD31296209 Insert into map. */
-                let key = format!("FeatureWherePredicate{}", nth);
+                let key = format!("FeatureDefault{}", nth);
                 map.insert(key, new_ix);
 
                 nth += 1;
