@@ -5,7 +5,7 @@ use typestate_builder::TypestateBuilder;
 fn main() {}
 
 #[derive(TypestateBuilder)]
-// #[typestate_builder(builder_type = "aaa", builder_method = "bbb")]
+#[typestate_builder(builder_type = "aaa", builder_method = "bbb")]
 struct ComplexTuple<'a, T, U, V>(
     #[typestate_builder(default)] T, // Generic type T
     &'a U,                           // Reference to type U with lifetime 'a

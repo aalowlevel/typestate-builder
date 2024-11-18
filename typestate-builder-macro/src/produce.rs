@@ -20,11 +20,24 @@ use crate::graph::StructGraph;
 pub fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> Vec<TokenStream2> {
     vec![
         builder::run(graph, map),
+        trait_field_build::run(graph, map),
         builder_states::run(graph, map),
         builder_new_impl::run(graph, map),
         builder_impl::run(graph, map),
         builder_build_impl::run(graph, map),
     ]
+}
+
+macro_rules! extract_uniq_node {
+    ($graph:expr, $map:expr, $variant:ident, $constant:ident) => {{
+        let Some(ix) = $map.get(crate::graph::mapkey::uniq::$constant) else {
+            panic!("{}", crate::graph::msg::ix::$constant);
+        };
+        let crate::StructElement::$variant(node) = &$graph[*ix] else {
+            panic!("{}", crate::graph::msg::node::$constant);
+        };
+        node
+    }};
 }
 
 mod builder {
@@ -131,21 +144,39 @@ mod builder {
     }
 }
 
+mod trait_field_build {
+    use indexmap::IndexMap;
+    use petgraph::graph::NodeIndex;
+    use proc_macro2::TokenStream as TokenStream2;
+    use quote::{format_ident, quote};
+
+    use crate::graph::StructGraph;
+
+    pub(super) fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> TokenStream2 {
+        let vis = extract_uniq_node!(graph, map, Visibility, VIS);
+        let builder_ident = extract_uniq_node!(graph, map, BuilderIdent, BUILDER_IDENT);
+
+        let trait_ident = format_ident!("{}FieldBuild", **builder_ident);
+
+        quote! {
+            #vis trait #trait_ident {
+                type Built;
+                fn build(self) -> Self::Built;
+            }
+        }
+    }
+}
+
 mod builder_states {
     use indexmap::IndexMap;
     use petgraph::graph::NodeIndex;
     use proc_macro2::TokenStream as TokenStream2;
     use quote::quote;
 
-    use crate::graph::{mapkey, msg, traverse, StructElement, StructGraph, StructRelation};
+    use crate::graph::{mapkey, traverse, StructElement, StructGraph, StructRelation};
 
     pub(super) fn run(graph: &StructGraph, map: &IndexMap<String, NodeIndex>) -> TokenStream2 {
-        let Some(ix) = map.get(mapkey::uniq::VIS) else {
-            panic!("{}", msg::ix::VIS);
-        };
-        let StructElement::Visibility(vis) = &graph[*ix] else {
-            panic!("{}", msg::node::VIS);
-        };
+        let vis = extract_uniq_node!(graph, map, Visibility, VIS);
 
         let action = |graph: &StructGraph, _edge, builder_node| match &graph[builder_node] {
             StructElement::BuilderStateEmpty(ident) => quote! { #vis struct #ident; },
