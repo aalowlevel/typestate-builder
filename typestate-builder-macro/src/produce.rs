@@ -645,8 +645,8 @@ mod builder_build_impl {
 
     use crate::{
         graph::{
-            self, mapkey, msg, traverse, BuilderStateAdded, StructElement, StructGraph,
-            StructRelation, StructType,
+            mapkey, msg, traverse, BuilderStateAdded, StructElement, StructGraph, StructRelation,
+            StructType,
         },
         helper,
     };
@@ -692,22 +692,6 @@ mod builder_build_impl {
             None => (None, None),
         };
 
-        let feature_default = FeatureDefault {
-            graph,
-            map,
-            ty,
-            gfirst: &gfirst,
-            gsecond: &gsecond,
-            gmethod: &gmethod,
-            vis,
-            ident,
-            builder_ident,
-            addeds: &addeds,
-            where_clause: &where_clause,
-            fields: &fields,
-        }
-        .create();
-
         let gsecond = gsecond.map(|gsecond| {
             if !gsecond.is_empty() {
                 Some(quote! { <#(#gsecond),*> })
@@ -722,7 +706,6 @@ mod builder_build_impl {
                     #ident #fields
                 }
             }
-            #feature_default
         }
     }
 
@@ -1023,81 +1006,5 @@ mod builder_build_impl {
         }
 
         res
-    }
-
-    struct FeatureDefault<'a> {
-        graph: &'a StructGraph,
-        map: &'a IndexMap<String, NodeIndex>,
-        ty: &'a StructType,
-        gfirst: &'a Option<TokenStream2>,
-        gsecond: &'a Option<Vec<TokenStream2>>,
-        gmethod: &'a Option<TokenStream2>,
-        vis: &'a syn::Visibility,
-        ident: &'a syn::Ident,
-        builder_ident: &'a Rc<syn::Ident>,
-        addeds: &'a Option<TokenStream2>,
-        where_clause: &'a Option<TokenStream2>,
-        fields: &'a Option<TokenStream2>,
-    }
-
-    impl FeatureDefault<'_> {
-        fn create(&self) -> Option<TokenStream2> {
-            if let Some(start_node) = self.map.get(mapkey::startp::FEATURE_DEFAULT) {
-                let fds = self.traverse_feature_defaults(start_node);
-
-                if !fds.is_empty() {
-                    self.generate_impl_block(fds)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        }
-
-        fn traverse_feature_defaults(&self, start: &NodeIndex) -> Vec<graph::FeatureDefault> {
-            traverse(
-                self.graph,
-                &[&StructRelation::FeatureDefaultTrain],
-                *start,
-                true,
-                |graph, _, node_fd| {
-                    let StructElement::FeatureDefault(fd) = &graph[node_fd] else {
-                        panic!("{}", msg::node::FEATURE_DEFAULT);
-                    };
-                    fd.clone()
-                },
-            )
-        }
-
-        fn generate_impl_block(&self, fds: Vec<graph::FeatureDefault>) -> Option<TokenStream2> {
-            let gfirst = self.gfirst;
-            let gsecond = self.gsecond.as_ref().map(|gsecond| {
-                if !gsecond.is_empty() {
-                    Some(quote! {<#(#gsecond),*>})
-                } else {
-                    None
-                }
-            });
-            let gmethod = self.gmethod;
-            let vis = self.vis;
-            let ident = self.ident;
-            let builder_ident = self.builder_ident;
-            let addeds = self.addeds;
-            let where_clause = self.where_clause;
-            let fields = self.ty.wrap_fields(self.fields);
-
-            Some(quote! {
-                impl #gfirst #builder_ident #addeds #where_clause {
-                    #vis fn build #gmethod (self) -> #ident #gsecond {
-                        #ident #fields
-                    }
-                }
-            })
-        }
-
-        fn modifiy_addeds(&self, fds: &[graph::FeatureDefault]) {}
-
-        fn modifiy_fields(&self, fds: &[graph::FeatureDefault]) {}
     }
 }

@@ -11,16 +11,11 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use std::rc::Rc;
-
 use indexmap::IndexMap;
 use petgraph::graph::NodeIndex;
-use proc_macro2::Span;
 
 use crate::{
-    graph::{
-        mapkey, msg, traverse_mut, FeatureDefault, StructElement, StructGraph, StructRelation,
-    },
+    graph::{mapkey, msg, traverse_mut, StructElement, StructGraph, StructRelation},
     helper::extract_ident,
 };
 
@@ -36,7 +31,6 @@ fn bind_field_elements(graph: &mut StructGraph, map: &mut IndexMap<String, NodeI
             list_field_assets(graph, node_field);
             traversal_field_to_generics(graph, node_field, map);
             traversal_field_to_where_clause(graph, node_field, map);
-            add_feature_default(graph, node_field, map);
         };
         let _: () = traverse_mut(graph, &[&StructRelation::FieldTrain], start, true, action);
     }
@@ -170,82 +164,6 @@ fn traversal_field_to_where_clause(
             &[&StructRelation::WherePredicateTrain],
             *start,
             true,
-            action,
-        );
-    }
-}
-
-fn add_feature_default(
-    graph: &mut StructGraph,
-    node_field: NodeIndex,
-    map: &mut IndexMap<String, NodeIndex>,
-) {
-    let StructElement::Field(field) = &mut graph[node_field] else {
-        panic!("{}", msg::node::FIELD);
-    };
-
-    let nth_field = field.nth;
-
-    if field.default {
-        let mut nth = 0;
-        let mut node_head = None;
-
-        let action = |graph: &mut StructGraph, _, node| {
-            let StructElement::Generic(generic) = &graph[node] else {
-                panic!("{}", msg::node::GENERIC);
-            };
-
-            /* ✅ #TD48204866 Add default bound in feature where clause. */
-            if let syn::GenericParam::Type(syn::TypeParam { ident, .. }) = generic.syn.as_ref() {
-                /* ✅ #TD45379208 Create default bound. */
-                let default_trait_bound = syn::TypeParamBound::Trait(syn::TraitBound {
-                    paren_token: None,
-                    modifier: syn::TraitBoundModifier::None,
-                    lifetimes: None,
-                    path: syn::Path::from(syn::Ident::new("SomeTrait", Span::call_site())),
-                });
-                let mut bounds = syn::punctuated::Punctuated::new();
-                bounds.push(default_trait_bound);
-
-                /* ✅ #TD65080481 Create type and syn of wp. */
-                let path = syn::Path::from(ident.clone());
-                let syn = Rc::new(syn::PredicateType {
-                    lifetimes: None,
-                    bounded_ty: syn::Type::Path(syn::TypePath { qself: None, path }),
-                    colon_token: syn::token::Colon::default(),
-                    bounds,
-                });
-
-                /* ✅ #TD03009407 Compile wp. */
-                let fd = FeatureDefault {
-                    nth,
-                    nth_field,
-                    syn,
-                };
-
-                /* ✅ #TD11692816 Add node. */
-                let new_ix = graph.add_node(StructElement::FeatureDefault(fd));
-
-                /* ✅ #TD29393092 Add edge. */
-                if let Some(node_head) = node_head {
-                    graph.add_edge(node_head, new_ix, StructRelation::FeatureDefaultTrain);
-                } else {
-                    node_head = Some(new_ix);
-                }
-
-                /* ✅ #TD31296209 Insert into map. */
-                let key = format!("FeatureDefault{}", nth);
-                map.insert(key, new_ix);
-
-                nth += 1;
-            }
-        };
-
-        let _: () = traverse_mut(
-            graph,
-            &[&StructRelation::FieldGenericInMainType],
-            node_field,
-            false,
             action,
         );
     }

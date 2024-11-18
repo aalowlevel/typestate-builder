@@ -29,7 +29,6 @@ pub mod mapkey {
         pub const GENERICS: &str = "Generic0";
         pub const WP: &str = "WherePredicate0";
         pub const BUILDER_FIELD: &str = "BuilderField0";
-        pub const FEATURE_DEFAULT: &str = "FeatureDefault0";
     }
     pub mod uniq {
         pub const VIS: &str = "Visibility";
@@ -57,7 +56,6 @@ pub mod msg {
         pub const WP: &str = "Node must be a Where Predicate.";
         pub const METHOD_BUILDER_IDENT: &str = "Node must be a method builder ident.";
         pub const BUILDER_IDENT: &str = "Node must be a builder ident.";
-        pub const FEATURE_DEFAULT: &str = "Node must be a Feature Default.";
     }
 }
 
@@ -74,7 +72,6 @@ pub enum StructElement {
     BuilderIdent(Rc<syn::Ident>),
     BuilderField(Rc<syn::Ident>),
     BuilderGeneric(Rc<syn::Ident>),
-    FeatureDefault(FeatureDefault),
 }
 
 impl Serialize for StructElement {
@@ -147,12 +144,6 @@ impl Serialize for StructElement {
                 "BuilderGeneric",
                 &json!(ident.to_string()),
             ),
-            StructElement::FeatureDefault(feature_default) => serializer.serialize_newtype_variant(
-                "StructElement",
-                0,
-                "FeatureDefault",
-                feature_default,
-            ),
         }
     }
 }
@@ -203,7 +194,6 @@ pub enum StructRelation {
     BuilderFieldToBuilderState,
     BuilderGenericTrain,
     BuilderStatePair,
-    FeatureDefaultTrain,
 }
 
 pub type StructGraph = Graph<StructElement, StructRelation>;
@@ -601,39 +591,6 @@ impl Serialize for BuilderStateAdded {
         res.skip_field("ty")?;
         res.skip_field("where_predicates")?;
         res.skip_field("phantoms")?;
-        res.end()
-    }
-}
-
-pub struct FeatureDefault {
-    pub nth: usize,
-    pub nth_field: usize,
-    pub syn: Rc<syn::PredicateType>,
-}
-
-impl Clone for FeatureDefault {
-    fn clone(&self) -> Self {
-        Self {
-            nth: self.nth,
-            nth_field: self.nth_field,
-            syn: Rc::clone(&self.syn),
-        }
-    }
-}
-
-impl Serialize for FeatureDefault {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut res = serializer.serialize_struct("FeatureDefault", 2)?;
-        res.serialize_field("variant", "Default")?;
-        res.serialize_field("nth", &self.nth)?;
-        if let syn::Type::Path(path) = &self.syn.bounded_ty {
-            if let Some(ident) = path.path.get_ident() {
-                res.serialize_field("bounded_ty_ident", &ident.to_string())?;
-            }
-        }
         res.end()
     }
 }
