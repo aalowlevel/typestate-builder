@@ -68,6 +68,8 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
     // Parse the input token stream into a `DeriveInput` structure.
     let input = parse_macro_input!(input as DeriveInput);
 
+    let filename = format!("{}.dot", input.ident);
+
     let (mut graph, mut map) = parse::run(input);
     analyze::run(&mut graph, &mut map);
     analyze2::run(&mut graph, &mut map);
@@ -80,7 +82,7 @@ pub fn typestate_builder_derive(input: TokenStream) -> TokenStream {
 
     #[cfg(debug_assertions)]
     {
-        helper::write_graph_to_file(&graph, "example.dot").unwrap();
+        helper::write_graph_to_file(&graph, &filename).unwrap();
     }
     output.into()
 }

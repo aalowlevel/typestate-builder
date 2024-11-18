@@ -11,7 +11,10 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 // be dual licensed as above, without any additional terms or conditions.
 
-use std::{fs::File, io::Write};
+use std::{
+    fs::{self, File},
+    io::Write,
+};
 
 use petgraph::{dot::Dot, Graph};
 use syn::{Ident, PathArguments, Type};
@@ -46,13 +49,16 @@ pub fn extract_ident(ty: &Type) -> Option<&Ident> {
     }
 }
 
-#[allow(dead_code)]
 pub fn write_graph_to_file<N: std::fmt::Debug, E: std::fmt::Debug>(
     graph: &Graph<N, E>,
     filename: &str,
 ) -> std::io::Result<()> {
     let dot = format!("{:?}", Dot::new(graph));
-    let mut file = File::create(filename)?;
+    let mut path = std::env::current_dir()?;
+    path.push("dots");
+    let _ = fs::create_dir_all(&path);
+    path.push(filename);
+    let mut file = File::create(path)?;
     file.write_all(dot.as_bytes())?;
     Ok(())
 }
