@@ -38,7 +38,7 @@ fn bind_field_elements(graph: &mut StructGraph, map: &mut IndexMap<String, NodeI
             traversal_field_to_where_clause(graph, node_field, map);
             add_feature_default(graph, node_field, map);
         };
-        traverse_mut(graph, &[&StructRelation::FieldTrain], start, true, action);
+        let _: () = traverse_mut(graph, &[&StructRelation::FieldTrain], start, true, action);
     }
 }
 
@@ -49,7 +49,7 @@ fn bind_where_predicate_elements(graph: &mut StructGraph, map: &mut IndexMap<Str
             list_wp_assets(graph, node_wp);
             traversal_wp_to_generics(graph, node_wp, map);
         };
-        traverse_mut(
+        let _: () = traverse_mut(
             graph,
             &[&StructRelation::WherePredicateTrain],
             start,
@@ -93,7 +93,7 @@ fn traversal_field_to_generics(
         let action = |graph: &mut StructGraph, _edge, node_generic| {
             search_in_generics_by_field(graph, node_field, node_generic);
         };
-        traverse_mut(
+        let _: () = traverse_mut(
             graph,
             &[&StructRelation::GenericTrain],
             *start,
@@ -165,7 +165,7 @@ fn traversal_field_to_where_clause(
             search_in_wp_by_field(graph, node_field, node_wp);
         };
 
-        traverse_mut(
+        let _: () = traverse_mut(
             graph,
             &[&StructRelation::WherePredicateTrain],
             *start,
@@ -183,6 +183,8 @@ fn add_feature_default(
     let StructElement::Field(field) = &mut graph[node_field] else {
         panic!("{}", msg::node::FIELD);
     };
+
+    let nth_field = field.nth;
 
     if field.default {
         let mut nth = 0;
@@ -215,7 +217,11 @@ fn add_feature_default(
                 });
 
                 /* ✅ #TD03009407 Compile wp. */
-                let fd = FeatureDefault { nth, syn };
+                let fd = FeatureDefault {
+                    nth,
+                    nth_field,
+                    syn,
+                };
 
                 /* ✅ #TD11692816 Add node. */
                 let new_ix = graph.add_node(StructElement::FeatureDefault(fd));
@@ -235,7 +241,7 @@ fn add_feature_default(
             }
         };
 
-        traverse_mut(
+        let _: () = traverse_mut(
             graph,
             &[&StructRelation::FieldGenericInMainType],
             node_field,
@@ -290,7 +296,7 @@ fn traversal_wp_to_generics(
             search_in_generics_by_wp(graph, node_wp, node_generic);
         };
 
-        traverse_mut(
+        let _: () = traverse_mut(
             graph,
             &[&StructRelation::GenericTrain],
             *start,

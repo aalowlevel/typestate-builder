@@ -50,7 +50,7 @@ fn create_builder(graph: &mut StructGraph, map: &mut IndexMap<String, NodeIndex>
             let ident_tc = syn::Ident::new(&ident_tc_str, Span::call_site());
             (field_node, ident, ident_tc)
         };
-        let builder = traverse(graph, &[&StructRelation::FieldTrain], *ix, true, action);
+        let builder: Vec<_> = traverse(graph, &[&StructRelation::FieldTrain], *ix, true, action);
 
         /* ✅ #TD52440080 Create builder fields, generics and their relations. */
         let mut predecessor_ident = None;
@@ -245,7 +245,7 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
                     StructRelation::BuilderFieldToBuilderState,
                 );
             };
-            traverse_mut(
+            let _: () = traverse_mut(
                 graph,
                 &[&StructRelation::FieldToBuilderField],
                 field_node,
@@ -253,7 +253,7 @@ fn create_builder_states(graph: &mut StructGraph, map: &mut IndexMap<String, Nod
                 action,
             );
         };
-        traverse_mut(graph, &[&StructRelation::FieldTrain], *start, true, action);
+        let _: () = traverse_mut(graph, &[&StructRelation::FieldTrain], *start, true, action);
     }
 }
 

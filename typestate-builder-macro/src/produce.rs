@@ -71,7 +71,7 @@ mod builder {
             };
 
             /* ⚠️ WARNING #WR04864549 Order-sensitive graph traversal function call. */
-            let idents = traverse(
+            let idents: Vec<_> = traverse(
                 graph,
                 &[
                     &StructRelation::BuilderFieldToBuilderGeneric,
@@ -147,49 +147,54 @@ mod builder_states {
             panic!("{}", msg::node::VIS);
         };
 
-        if let Some(pairs) = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
-            /* ⚠️ WARNING #WR23330504 Order-sensitive graph traversal function call. */
-            traverse(
-                graph,
-                &[
-                    &StructRelation::BuilderStatePair,
-                    &StructRelation::BuilderFieldToBuilderState,
-                    &StructRelation::BuilderFieldTrain,
-                ],
-                *start,
-                false,
-                |graph, _edge, builder_node| match &graph[builder_node] {
-                    StructElement::BuilderStateEmpty(ident) => quote! { #vis struct #ident; },
-                    StructElement::BuilderStateAdded(bsa) => {
-                        let ident = &bsa.ident;
-                        let generics = if !bsa.generics.is_empty() {
-                            let generics = &bsa.generics;
-                            quote! { <#(#generics),*> }
-                        } else {
-                            quote! {}
-                        };
-                        let ty = &bsa.ty;
-                        let phantoms = if !bsa.phantoms.is_empty() {
-                            let phantoms = &bsa.phantoms;
-                            quote! { , #(#phantoms),* }
-                        } else {
-                            quote! {}
-                        };
-                        let where_clause = if !bsa.where_predicates.is_empty() {
-                            let wps = &bsa.where_predicates;
-                            quote! { where #(#wps),* }
-                        } else {
-                            quote! {}
-                        };
+        let action = |graph: &StructGraph, _edge, builder_node| match &graph[builder_node] {
+            StructElement::BuilderStateEmpty(ident) => quote! { #vis struct #ident; },
+            StructElement::BuilderStateAdded(bsa) => {
+                let ident = &bsa.ident;
+                let generics = if !bsa.generics.is_empty() {
+                    let generics = &bsa.generics;
+                    quote! { <#(#generics),*> }
+                } else {
+                    quote! {}
+                };
+                let ty = &bsa.ty;
+                let phantoms = if !bsa.phantoms.is_empty() {
+                    let phantoms = &bsa.phantoms;
+                    quote! { , #(#phantoms),* }
+                } else {
+                    quote! {}
+                };
+                let where_clause = if !bsa.where_predicates.is_empty() {
+                    let wps = &bsa.where_predicates;
+                    quote! { where #(#wps),* }
+                } else {
+                    quote! {}
+                };
 
-                        quote! {
-                            #vis struct #ident #generics(#ty #phantoms) #where_clause;
-                        }
-                    }
-                    _ => quote! {},
-                },
-            )
-        }) {
+                quote! {
+                    #vis struct #ident #generics(#ty #phantoms) #where_clause;
+                }
+            }
+            _ => quote! {},
+        };
+
+        if let Some(pairs) = map
+            .get(mapkey::startp::BUILDER_FIELD)
+            .map(|start| -> Vec<_> {
+                /* ⚠️ WARNING #WR23330504 Order-sensitive graph traversal function call. */
+                traverse(
+                    graph,
+                    &[
+                        &StructRelation::BuilderStatePair,
+                        &StructRelation::BuilderFieldToBuilderState,
+                        &StructRelation::BuilderFieldTrain,
+                    ],
+                    *start,
+                    false,
+                    action,
+                )
+            })
+        {
             quote! { #(#pairs)* }
         } else {
             quote! {}
@@ -242,7 +247,7 @@ mod builder_new_impl {
         };
 
         let generics = map.get(mapkey::startp::GENERICS).map(|start| {
-            let generics = traverse(
+            let generics: Vec<_> = traverse(
                 graph,
                 &[&StructRelation::GenericTrain],
                 *start,
@@ -290,7 +295,7 @@ mod builder_new_impl {
         };
 
         let where_clause = map.get(mapkey::startp::WP).map(|start| {
-            let wps = traverse(
+            let wps: Vec<_> = traverse(
                 graph,
                 &[&StructRelation::WherePredicateTrain],
                 *start,
@@ -310,7 +315,7 @@ mod builder_new_impl {
         });
 
         let collections = map.get(mapkey::startp::BUILDER_FIELD).map(|start| {
-            let collected = traverse(
+            let collected: Vec<_> = traverse(
                 graph,
                 &[
                     &StructRelation::BuilderFieldToBuilderState,
@@ -447,7 +452,7 @@ mod builder_impl {
                 StructElement::BuilderStateAdded(rc) => addeds.push(Rc::clone(rc)),
                 _ => {}
             };
-            traverse(
+            let _: () = traverse(
                 graph,
                 &[
                     &StructRelation::BuilderStatePair,
@@ -640,8 +645,8 @@ mod builder_build_impl {
 
     use crate::{
         graph::{
-            mapkey, msg, traverse, BuilderStateAdded, StructElement, StructGraph, StructRelation,
-            StructType,
+            self, mapkey, msg, traverse, BuilderStateAdded, StructElement, StructGraph,
+            StructRelation, StructType,
         },
         helper,
     };
@@ -687,31 +692,44 @@ mod builder_build_impl {
             None => (None, None),
         };
 
-        match ty {
-            StructType::Named => {
-                quote! {
-                    impl #gfirst #builder_ident #addeds #where_clause {
-                        #vis fn build #gmethod (self) -> #ident #gsecond {
-                            #ident { #fields }
-                        }
-                    }
+        let feature_default = FeatureDefault {
+            graph,
+            map,
+            ty,
+            gfirst: &gfirst,
+            gsecond: &gsecond,
+            gmethod: &gmethod,
+            vis,
+            ident,
+            builder_ident,
+            addeds: &addeds,
+            where_clause: &where_clause,
+            fields: &fields,
+        }
+        .create();
+
+        let gsecond = gsecond.map(|gsecond| {
+            if !gsecond.is_empty() {
+                Some(quote! { <#(#gsecond),*> })
+            } else {
+                None
+            }
+        });
+        let fields = ty.wrap_fields(fields);
+        quote! {
+            impl #gfirst #builder_ident #addeds #where_clause {
+                #vis fn build #gmethod (self) -> #ident #gsecond {
+                    #ident #fields
                 }
             }
-            StructType::Unnamed => {
-                quote! {
-                    impl #gfirst #builder_ident #addeds #where_clause {
-                        #vis fn build #gmethod (self) -> #ident #gsecond {
-                            #ident ( #fields )
-                        }
-                    }
-                }
-            }
+            #feature_default
         }
     }
 
     struct Generics {
         first: TokenStream2,
-        second: TokenStream2,
+        /// The second must come without brackets because of the possibility of it being used later.
+        second: Vec<TokenStream2>,
         method: TokenStream2,
     }
 
@@ -734,7 +752,7 @@ mod builder_build_impl {
                 (Rc::clone(&generic.syn), field_conn)
             };
 
-            let generics = traverse(
+            let generics: Vec<_> = traverse(
                 graph,
                 &[&StructRelation::GenericTrain],
                 *start,
@@ -744,7 +762,7 @@ mod builder_build_impl {
 
             if !generics.is_empty() {
                 let mut first = TokenStream2::new();
-                let mut second = TokenStream2::new();
+                let mut second = Vec::with_capacity(generics.len());
                 let mut method = TokenStream2::new();
 
                 for (generic, field_connection) in generics {
@@ -752,12 +770,12 @@ mod builder_build_impl {
                         syn::GenericParam::Lifetime(lifetime_param) => {
                             first.extend(quote! { #generic, });
                             let lt = &lifetime_param.lifetime;
-                            second.extend(quote! { #lt, });
+                            second.push(quote! { #lt });
                         }
                         syn::GenericParam::Type(type_param) => {
                             first.extend(quote! { #generic, });
                             let ident = &type_param.ident;
-                            second.extend(quote! { #ident, });
+                            second.push(quote! { #ident });
                         }
                         syn::GenericParam::Const(const_param) => {
                             let ident = &const_param.ident;
@@ -766,14 +784,14 @@ mod builder_build_impl {
                             } else {
                                 first.extend(quote! { #generic, });
                             }
-                            second.extend(quote! { #ident, });
+                            second.push(quote! { #ident });
                         }
                     }
                 }
 
                 Some(Self {
                     first: quote! { <#first> },
-                    second: quote! { <#second> },
+                    second,
                     method: if !method.is_empty() {
                         quote! { <#method> }
                     } else {
@@ -800,7 +818,7 @@ mod builder_build_impl {
                     None
                 }
             };
-            let addeds = traverse(
+            let addeds: Vec<_> = traverse(
                 graph,
                 &[
                     &StructRelation::BuilderStatePair,
@@ -891,7 +909,7 @@ mod builder_build_impl {
                     _ => {}
                 };
 
-            traverse(
+            let _: () = traverse(
                 graph,
                 &[
                     &StructRelation::BuilderStatePair,
@@ -1007,39 +1025,79 @@ mod builder_build_impl {
         res
     }
 
-    pub(super) fn feature_default(
-        graph: &StructGraph,
-        map: &IndexMap<String, NodeIndex>,
-    ) -> TokenStream2 {
-        let action_node_fd = |graph: &StructGraph, _, node_fd: NodeIndex| {
-            let StructElement::FeatureDefault(feature) = &graph[node_fd] else {
-                panic!("{}", msg::node::FEATURE_DEFAULT);
-            };
+    struct FeatureDefault<'a> {
+        graph: &'a StructGraph,
+        map: &'a IndexMap<String, NodeIndex>,
+        ty: &'a StructType,
+        gfirst: &'a Option<TokenStream2>,
+        gsecond: &'a Option<Vec<TokenStream2>>,
+        gmethod: &'a Option<TokenStream2>,
+        vis: &'a syn::Visibility,
+        ident: &'a syn::Ident,
+        builder_ident: &'a Rc<syn::Ident>,
+        addeds: &'a Option<TokenStream2>,
+        where_clause: &'a Option<TokenStream2>,
+        fields: &'a Option<TokenStream2>,
+    }
 
-            quote! {}
-        };
+    impl FeatureDefault<'_> {
+        fn create(&self) -> Option<TokenStream2> {
+            if let Some(start_node) = self.map.get(mapkey::startp::FEATURE_DEFAULT) {
+                let fds = self.traverse_feature_defaults(start_node);
 
-        let feature = if let Some(start) = map.get(mapkey::startp::FEATURE_DEFAULT) {
-            let bounds = traverse(
-                graph,
-                &[&StructRelation::FeatureDefaultTrain],
-                *start,
-                true,
-                action_node_fd,
-            );
-
-            if !bounds.is_empty() {
-                Some(quote! {})
+                if !fds.is_empty() {
+                    self.generate_impl_block(fds)
+                } else {
+                    None
+                }
             } else {
                 None
             }
-        } else {
-            None
-        };
-
-        match feature {
-            Some(feature) => feature,
-            None => quote! {},
         }
+
+        fn traverse_feature_defaults(&self, start: &NodeIndex) -> Vec<graph::FeatureDefault> {
+            traverse(
+                self.graph,
+                &[&StructRelation::FeatureDefaultTrain],
+                *start,
+                true,
+                |graph, _, node_fd| {
+                    let StructElement::FeatureDefault(fd) = &graph[node_fd] else {
+                        panic!("{}", msg::node::FEATURE_DEFAULT);
+                    };
+                    fd.clone()
+                },
+            )
+        }
+
+        fn generate_impl_block(&self, fds: Vec<graph::FeatureDefault>) -> Option<TokenStream2> {
+            let gfirst = self.gfirst;
+            let gsecond = self.gsecond.as_ref().map(|gsecond| {
+                if !gsecond.is_empty() {
+                    Some(quote! {<#(#gsecond),*>})
+                } else {
+                    None
+                }
+            });
+            let gmethod = self.gmethod;
+            let vis = self.vis;
+            let ident = self.ident;
+            let builder_ident = self.builder_ident;
+            let addeds = self.addeds;
+            let where_clause = self.where_clause;
+            let fields = self.ty.wrap_fields(self.fields);
+
+            Some(quote! {
+                impl #gfirst #builder_ident #addeds #where_clause {
+                    #vis fn build #gmethod (self) -> #ident #gsecond {
+                        #ident #fields
+                    }
+                }
+            })
+        }
+
+        fn modifiy_addeds(&self, fds: &[graph::FeatureDefault]) {}
+
+        fn modifiy_fields(&self, fds: &[graph::FeatureDefault]) {}
     }
 }

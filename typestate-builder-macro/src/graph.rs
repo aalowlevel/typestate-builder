@@ -19,7 +19,7 @@ use petgraph::{
     Graph,
 };
 use proc_macro2::TokenStream as TokenStream2;
-use quote::ToTokens;
+use quote::{quote, ToTokens};
 use serde::{ser::SerializeStruct, Serialize};
 use serde_json::json;
 
@@ -173,6 +173,16 @@ pub enum StructType {
     Unnamed,
 }
 
+impl StructType {
+    pub fn wrap_fields(&self, fields: impl ToTokens) -> TokenStream2 {
+        match self {
+            StructType::Named => quote! {{ #fields }},
+            StructType::Unnamed => quote! {( #fields )},
+        }
+    }
+}
+
+/* ♻️ REFACTOR #RF51318383 Separate as marker and payload */
 #[derive(Debug, PartialEq)]
 pub enum StructRelation {
     GenericTrain,
@@ -597,7 +607,18 @@ impl Serialize for BuilderStateAdded {
 
 pub struct FeatureDefault {
     pub nth: usize,
+    pub nth_field: usize,
     pub syn: Rc<syn::PredicateType>,
+}
+
+impl Clone for FeatureDefault {
+    fn clone(&self) -> Self {
+        Self {
+            nth: self.nth,
+            nth_field: self.nth_field,
+            syn: Rc::clone(&self.syn),
+        }
+    }
 }
 
 impl Serialize for FeatureDefault {
@@ -617,21 +638,41 @@ impl Serialize for FeatureDefault {
     }
 }
 
-pub fn traverse<'a, N, E, F, R>(
+pub trait TraverseCollector<R> {
+    fn new(capacity: usize) -> Self;
+    fn collect(&mut self, item: R);
+}
+
+impl<R> TraverseCollector<R> for Vec<R> {
+    fn new(capacity: usize) -> Self {
+        Vec::with_capacity(capacity)
+    }
+    fn collect(&mut self, item: R) {
+        self.push(item);
+    }
+}
+
+impl TraverseCollector<()> for () {
+    fn new(_capacity: usize) -> Self {}
+    fn collect(&mut self, _: ()) {}
+}
+
+pub fn traverse<'a, C, N, E, F, R>(
     graph: &'a Graph<N, E>,
     filter_edge: &'a [&'a E],
     start_node: NodeIndex,
     include_start: bool,
     mut node_action: F,
-) -> Vec<R>
+) -> C
 where
     F: FnMut(&Graph<N, E>, Option<EdgeIndex>, NodeIndex) -> R,
     E: std::cmp::PartialEq,
+    C: TraverseCollector<R>,
 {
     let capacity = graph.capacity().0;
     let mut stack = Vec::with_capacity(capacity);
     let mut visited = IndexSet::with_capacity(capacity);
-    let mut results = Vec::with_capacity(capacity);
+    let mut collector = C::new(capacity);
     stack.push((start_node, None));
 
     while let Some((node, edge)) = stack.pop() {
@@ -640,7 +681,7 @@ where
 
             if edge.is_some() || include_start {
                 let result = node_action(graph, edge, node);
-                results.push(result);
+                collector.collect(result);
             }
 
             let mut neighbors: Vec<_> = graph
@@ -649,14 +690,13 @@ where
                 .filter(|&(edge, _)| filter_edge.contains(&&graph[edge]))
                 .collect();
 
-            // Sort neighbors based on filter_edge order
             neighbors.sort_by_key(|&(edge, _)| {
                 filter_edge
                     .iter()
                     .position(|&p| p == &graph[edge])
                     .unwrap_or(usize::MAX)
             });
-            neighbors.reverse(); // Reverse to maintain priority order when pushing to stack
+            neighbors.reverse();
 
             for (edge, neighbor) in neighbors {
                 if !visited.contains(&neighbor) {
@@ -665,24 +705,25 @@ where
             }
         }
     }
-    results
+    collector
 }
 
-pub fn traverse_mut<'a, N, E, F, R>(
+pub fn traverse_mut<'a, C, N, E, F, R>(
     graph: &'a mut Graph<N, E>,
     filter_edge: &'a [&'a E],
     start_node: NodeIndex,
     include_start: bool,
     mut node_action: F,
-) -> Vec<R>
+) -> C
 where
     F: FnMut(&mut Graph<N, E>, Option<EdgeIndex>, NodeIndex) -> R,
     E: std::cmp::PartialEq,
+    C: TraverseCollector<R>,
 {
     let capacity = graph.capacity().0;
     let mut stack = Vec::with_capacity(capacity);
     let mut visited = IndexSet::with_capacity(capacity);
-    let mut results = Vec::with_capacity(capacity);
+    let mut collector = C::new(capacity);
     stack.push((start_node, None));
 
     while let Some((node, edge)) = stack.pop() {
@@ -691,7 +732,7 @@ where
 
             if edge.is_some() || include_start {
                 let result = node_action(graph, edge, node);
-                results.push(result);
+                collector.collect(result);
             }
 
             let mut neighbors: Vec<_> = graph
@@ -700,14 +741,13 @@ where
                 .filter(|&(edge, _)| filter_edge.contains(&&graph[edge]))
                 .collect();
 
-            // Sort neighbors based on filter_edge order
             neighbors.sort_by_key(|&(edge, _)| {
                 filter_edge
                     .iter()
                     .position(|&p| p == &graph[edge])
                     .unwrap_or(usize::MAX)
             });
-            neighbors.reverse(); // Reverse to maintain priority order when pushing to stack
+            neighbors.reverse();
 
             for (edge, neighbor) in neighbors {
                 if !visited.contains(&neighbor) {
@@ -716,5 +756,5 @@ where
             }
         }
     }
-    results
+    collector
 }
