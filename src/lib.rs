@@ -197,7 +197,7 @@ Derive-macro-based generator that combines `Typestate` and `Builder` patterns. *
 pub use typestate_builder_macro::TypestateBuilder;
 
 #[cfg(test)]
-#[allow(dead_code)]
+#[allow(unused)]
 mod tests {
     use std::{
         alloc::{GlobalAlloc, Layout},
