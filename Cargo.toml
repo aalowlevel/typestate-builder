@@ -2,7 +2,6 @@
 name = "typestate-builder"
 version = "0.1.5"
 edition = "2021"
-rust-version = "1.78.0"
 authors = ["Andy Allison <rustacean15@gmail.com>"]
 description = "Derive-macro-based generator that combines `Typestate` and `Builder` patterns."
 license = "MIT OR Apache-2.0"
